@@ -4,7 +4,7 @@
 # =============================================================================
 
 ##@ Support de formation (app React à héberger, http://localhost:5174 en dev)
-.PHONY: formation-install formation-dev formation-stop formation-lint formation-build formation-run formation-run-stop formation-hash
+.PHONY: formation-install formation-dev formation-stop formation-lint formation-build formation-run formation-run-stop formation-hash formation-publish-stagiaire
 
 DCF       := $(DC) -f compose.yaml -f compose.formation.yaml
 FORMATION := $(DCF) --profile formation run --rm --no-deps formation
@@ -44,6 +44,22 @@ formation-deploy: ## Met à jour https://formation.zedcode.fr (sources → serve
 		--exclude .phpunit.cache --exclude .DS_Store --exclude .idea --exclude .git ./ $(DEPLOY_HOST):$(DEPLOY_DIR)/src/
 	$(DEPLOY_SSH) $(DEPLOY_HOST) 'cd $(DEPLOY_DIR) && docker build -q -f src/apps/formation/Dockerfile -t taskboard-formation src && docker compose up -d'
 	@echo "✅ Déployé : https://formation.zedcode.fr"
+
+STAGIAIRE_REPO ?= git@github.com:Zedcodefr/phpTuto-kaamelot.git
+
+formation-publish-stagiaire: ## Pousse le projet stagiaire (= contenu du zip) sur STAGIAIRE_REPO (m="message" optionnel)
+	$(FORMATION) npm run package
+	@set -e; src=$$(git describe --always --dirty); tmp=$$(mktemp -d); trap 'rm -rf "$$tmp"' EXIT; \
+	git clone -q $(STAGIAIRE_REPO) "$$tmp/repo"; \
+	find "$$tmp/repo" -mindepth 1 -maxdepth 1 ! -name .git -exec rm -rf {} +; \
+	unzip -q apps/formation/public/downloads/taskboard-projet.zip -d "$$tmp/zip"; \
+	cp -R "$$tmp/zip/taskboard/." "$$tmp/repo/"; \
+	cd "$$tmp/repo"; git add -A; \
+	if git diff --cached --quiet; then echo "✅ $(STAGIAIRE_REPO) déjà à jour"; exit 0; fi; \
+	git diff --cached --stat | tail -1; \
+	git commit -q -m "$(or $(m),Mise à jour du projet de départ (formation $$src))"; \
+	git push -q origin HEAD; \
+	echo "✅ Poussé sur $(STAGIAIRE_REPO) (formation $$src)"
 
 formation-hash: ## Génère le hash du mot de passe formateur (make formation-hash p='mon mot de passe')
 	@docker run --rm taskboard-formation node server/hash-password.mjs '$(p)'

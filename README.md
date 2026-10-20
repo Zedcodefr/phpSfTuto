@@ -109,6 +109,8 @@ Déploiement sur votre serveur : [apps/formation/README.md](apps/formation/READM
 Le projet distribué aux stagiaires (`taskboard-projet.zip`) est généré par `apps/formation/scripts/package.mjs` :
 il exclut `formateur/`, `apps/formation`, `formation.mk` et `compose.formation.yaml`, et retire de ce README
 les blocs encadrés par les commentaires HTML `formateur:start` / `formateur:end` (dont cette section).
+`make formation-publish-stagiaire` pousse ce même contenu sur le dépôt Git des stagiaires
+(`STAGIAIRE_REPO`, par défaut `git@github.com:Zedcodefr/phpTuto-kaamelot.git`) : un commit seulement s'il y a des changements.
 <!-- formateur:end -->
 
 ## Contenu du dépôt
