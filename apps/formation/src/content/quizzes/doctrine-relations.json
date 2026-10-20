@@ -1,0 +1,97 @@
+{
+  "id": "doctrine-relations",
+  "title": "Doctrine : relations",
+  "questions": [
+    {
+      "question": "Dans la relation Book ↔ Author du kata, quel est le côté propriétaire ?",
+      "code": "<?php\n// Book\n#[ORM\\ManyToOne(inversedBy: 'books')]\nprivate Author $author;\n\n// Author\n#[ORM\\OneToMany(targetEntity: Book::class, mappedBy: 'author')]\nprivate Collection $books;",
+      "choices": ["Author, car il « possède » les livres", "Book : c'est le ManyToOne, qui porte la clé étrangère author_id", "Les deux", "Celui qui est déclaré en premier dans le code"],
+      "answer": 1,
+      "explanation": "Le propriétaire est celui qui a la clé étrangère dans sa table. Dans un couple ManyToOne/OneToMany, c'est toujours le ManyToOne ; le côté inverse porte mappedBy."
+    },
+    {
+      "question": "Combien d'UPDATE ce code produit-il ?",
+      "code": "<?php\n$murakami->getBooks()->removeElement($book);\n$atwood->getBooks()->add($book);\n$em->flush();",
+      "choices": ["1 : author_id du livre devient l'id d'Atwood", "2", "0 : seul le côté inverse a été modifié, Doctrine ne le lit jamais au flush", "Une exception est levée"],
+      "answer": 2,
+      "explanation": "Doctrine n'écrit que ce qu'il trouve sur le côté propriétaire (Book::$author). Il faut appeler $book->setAuthor($atwood), qui met aussi à jour les collections en mémoire."
+    },
+    {
+      "question": "Pourquoi les entités du kata synchronisent-elles les deux côtés (setAuthor qui met à jour la collection de l'auteur) si seul le côté propriétaire compte pour la base ?",
+      "choices": ["C'est obligatoire, sinon flush() échoue", "Pour que les objets restent cohérents en mémoire pendant la requête (sinon $author->getBooks() serait faux jusqu'au prochain chargement)", "Pour éviter le lazy loading", "Pour déclencher les cascades"],
+      "answer": 1,
+      "explanation": "Doctrine ne fait pas le « relationship fixup » d'EF Core. Les méthodes add/remove/set gardent le graphe d'objets cohérent."
+    },
+    {
+      "question": "Book::$reviews a `cascade: ['persist']` et `orphanRemoval: true`. Quelles affirmations sont vraies ? (plusieurs réponses)",
+      "choices": [
+        "Une nouvelle Review ajoutée à un livre suivi est insérée au flush sans persist()",
+        "Retirer une critique de la collection puis flush() la supprime en base",
+        "Supprimer un auteur supprime ses livres et leurs critiques",
+        "orphanRemoval agit au niveau de la base de données, comme ON DELETE CASCADE"
+      ],
+      "answer": [0, 1],
+      "explanation": "cascade et orphanRemoval sont des comportements de l'ORM (PHP). onDelete: 'CASCADE' sur la JoinColumn est la contrainte SQL. Author::$books n'a aucune cascade : supprimer un auteur qui a des livres viole la clé étrangère."
+    },
+    {
+      "question": "Ticket B1 : supprimer un projet qui contient encore des tâches doit renvoyer 409. Quelle approche le cours recommande-t-il ?",
+      "choices": ["cascade: ['remove'] sur Project::$tasks", "onDelete: 'CASCADE' sur Task::$project", "Vérifier avant de supprimer (compter les tâches) et lever une ConflictHttpException", "orphanRemoval sur Project::$tasks"],
+      "answer": 2,
+      "explanation": "Le contrat interdit la suppression d'un projet non vide : on ne cascade pas aveuglément, on vérifie et on renvoie 409."
+    },
+    {
+      "question": "Que fait chaque ligne en termes de requêtes SQL ?",
+      "code": "<?php\n$book = $bookRepository->find(1);   // (1)\n$author = $book->getAuthor();       // (2)\necho $author->getName();            // (3)",
+      "choices": [
+        "(1) SELECT livre, (2) SELECT auteur, (3) rien",
+        "(1) SELECT livre, (2) rien : objet fantôme (lazy), (3) SELECT auteur au premier accès",
+        "(1) SELECT livre + auteur, (2) et (3) rien",
+        "Les trois lignes font une requête"
+      ],
+      "answer": 1,
+      "explanation": "Les relations sont LAZY par défaut. getAuthor() renvoie un objet dont seul l'id est connu ; il se charge au premier accès à une propriété."
+    },
+    {
+      "question": "Une liste de 50 tâches affiche le nom du projet et le nombre de commentaires. Le profiler montre 101 requêtes. Quelle est la meilleure correction ?",
+      "choices": [
+        "Passer les relations en fetch: EAGER",
+        "Fetch join sur le projet (join + addSelect) et un COUNT dans la requête (ou SIZE()) pour les commentaires",
+        "Mettre en cache les projets dans une propriété statique",
+        "Paginer à 10 tâches pour réduire le nombre de requêtes"
+      ],
+      "answer": 1,
+      "explanation": "C'est un double N+1. EAGER chargerait les relations partout, même quand on n'en a pas besoin. On charge ce qu'il faut, dans la requête qui en a besoin."
+    },
+    {
+      "question": "Quelle est la différence entre ces deux requêtes ?",
+      "code": "<?php\n// A\n$qb->join('b.author', 'a')->andWhere('a.country = :c');\n// B\n$qb->join('b.author', 'a')->addSelect('a')->andWhere('a.country = :c');",
+      "choices": ["Aucune, Doctrine charge toujours les entités jointes", "A filtre seulement ; B filtre ET charge les auteurs dans la même requête (fetch join)", "B renvoie des auteurs au lieu de livres", "A est invalide sans addSelect"],
+      "answer": 1,
+      "explanation": "Sans addSelect, la jointure ne sert qu'au WHERE : les auteurs restent des objets fantômes et seront chargés un par un (N+1)."
+    },
+    {
+      "question": "Ticket B2 : Task a un `author` et un `assignee`, tous deux vers User. Que conseille le cours ?",
+      "choices": [
+        "Une seule relation ManyToMany vers User",
+        "Deux ManyToOne unidirectionnels vers User (si bidirectionnels : deux collections inverses distinctes)",
+        "Une seule collection inverse User::$tasks pour les deux relations",
+        "Stocker les ids en colonnes int sans relation"
+      ],
+      "answer": 1,
+      "explanation": "Chaque relation a son côté inverse propre. Une relation n'a pas besoin d'être bidirectionnelle : moins de code, moins de pièges, et une requête suffit pour retrouver les tâches d'un utilisateur."
+    },
+    {
+      "question": "Sur une entité chargée, pourquoi ne faut-il jamais écrire `$this->reviews = new ArrayCollection([...])` ?",
+      "choices": ["ArrayCollection n'accepte pas de tableau", "Doctrine remplace la collection par une PersistentCollection qu'il suit : réaffecter la propriété lui fait perdre le suivi", "Cela déclenche une requête DELETE", "C'est autorisé uniquement dans le constructeur d'une entité chargée"],
+      "answer": 1,
+      "explanation": "On crée l'ArrayCollection dans le constructeur (entité NEW), puis on modifie la collection existante avec add(), removeElement(), clear()."
+    }
+  ],
+  "openQuestions": [
+    "Pour chaque relation de ton ticket, indique le côté propriétaire, le côté inverse (s'il existe) et justifie ce choix d'avoir (ou non) une relation bidirectionnelle.",
+    "Explique avec tes propres mots K20 du kata : pourquoi modifier `$from->getBooks()` ne suffit pas, et ce que fait réellement ta solution.",
+    "Montre une liste de ton API qui affiche une relation (projet, auteur, commentaires). Combien de requêtes SQL exécute-t-elle ? Comment l'as-tu vérifié ?",
+    "Quelle différence fais-tu entre `cascade: ['remove']`, `orphanRemoval: true` et `onDelete: 'CASCADE'` ? Lequel as-tu utilisé et pourquoi ?",
+    "Comment ta sérialisation JSON évite-t-elle la boucle infinie et le lazy loading caché ?"
+  ]
+}

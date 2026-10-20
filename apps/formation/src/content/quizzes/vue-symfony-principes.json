@@ -1,0 +1,155 @@
+{
+  "id": "vue-symfony-principes",
+  "title": "Principes de Symfony",
+  "questions": [
+    {
+      "question": "Dans Vue, l'unité de base est le composant. Quelle est l'unité de base du code que vous écrivez dans Symfony ?",
+      "choices": [
+        "Le bundle",
+        "Le service Doctrine",
+        "Le contrôleur : une méthode qui transforme une requête en réponse",
+        "Le fichier YAML de `config/packages/`"
+      ],
+      "answer": 2,
+      "explanation": "Un composant Vue vit tant que l'onglet est ouvert ; un contrôleur Symfony est appelé pour une requête, renvoie une réponse, puis tout est détruit. Le framework se charge du reste : parser HTTP, router, valider, sérialiser, gérer les erreurs."
+    },
+    {
+      "question": "À quel moment du cycle de vie d'une requête Symfony le routing est-il exécuté ?",
+      "choices": [
+        "Pendant l'événement `kernel.request`, avant que le contrôleur soit choisi",
+        "Au démarrage du serveur, une fois pour toutes, comme `app.get(...)` en Express",
+        "Dans le contrôleur, via `$this->route()`",
+        "Pendant `kernel.response`"
+      ],
+      "answer": 0,
+      "explanation": "Chaque étape du kernel est un événement : `kernel.request` (routing, sécurité), `kernel.controller`, `kernel.controller_arguments` (résolution des arguments), le contrôleur, `kernel.response`, et `kernel.exception` en cas d'erreur. Rien n'est enregistré « une fois pour toutes » : tout est rejoué à chaque requête."
+    },
+    {
+      "question": "En Express, l'ordre des middlewares est l'ordre des `app.use(...)`. Comment Symfony détermine-t-il l'ordre des listeners d'un même événement ?",
+      "choices": [
+        "Par l'ordre alphabétique des classes",
+        "Par l'ordre des fichiers dans `src/`",
+        "Chaque listener déclare l'événement écouté et une priorité ; `debug:event-dispatcher` affiche la chaîne réelle",
+        "Par l'ordre d'appel dans `public/index.php`"
+      ],
+      "answer": 2,
+      "explanation": "On n'écrit pas la chaîne à la main : chaque listener déclare son événement et sa priorité. `make sf c=\"debug:event-dispatcher kernel.request\"` montre qui écoute et dans quel ordre."
+    },
+    {
+      "question": "Quel est l'équivalent Symfony du middleware d'erreur Express `(err, req, res, next)`, ou de `app.config.errorHandler` en Vue ?",
+      "choices": [
+        "Un listener de `kernel.request`",
+        "Un `try`/`catch` dans chaque contrôleur",
+        "Un listener de `kernel.terminate`",
+        "Un listener de `kernel.exception`"
+      ],
+      "answer": 3,
+      "explanation": "Si une exception est levée n'importe où, Symfony déclenche `kernel.exception`, qui la transforme en réponse d'erreur (JSON problem details pour une API). C'est le `catch (\\Throwable)` de votre front controller en PHP pur, fourni par le framework."
+    },
+    {
+      "question": "Vous créez `src/Service/TaskStatsService.php` et l'ajoutez comme paramètre du constructeur de `TaskController`. Que devez-vous faire d'autre ?",
+      "choices": [
+        "L'enregistrer avec un `provide()` dans `config/services.yaml`",
+        "Rien : toute classe de `src/` est un service candidat et l'autowiring l'injecte d'après le type du paramètre",
+        "Ajouter un attribut `#[Injectable]` sur la classe, comme `@Injectable()` dans NestJS",
+        "Le récupérer dans le contrôleur avec `$container->get(TaskStatsService::class)`"
+      ],
+      "answer": 1,
+      "explanation": "La règle `App\\: resource: '../src/'` de `services.yaml` déclare toutes les classes de `src/` comme services. Le conteneur lit le type de chaque paramètre du constructeur et fournit l'instance : c'est l'autowiring, sans décorateur."
+    },
+    {
+      "question": "En comparant avec `provide`/`inject` et Pinia, quelles affirmations sur les services Symfony sont vraies ? (plusieurs réponses)",
+      "choices": [
+        "Un service est partagé : une seule instance pendant la requête",
+        "Un tableau stocké dans une propriété de service survit d'une requête à l'autre, comme l'état d'un store Pinia",
+        "Une classe déclare ses dépendances dans son constructeur et ne les crée pas elle-même",
+        "On peut donner un faux repository au contrôleur dans un test, car il dépend d'un type et non d'un `new`"
+      ],
+      "answer": [
+        0,
+        2,
+        3
+      ],
+      "explanation": "Comme `useTaskStore()`, un service est une instance partagée… mais seulement le temps d'une requête : à la suivante, tout est reconstruit (modèle share-nothing). L'état durable, c'est la base de données."
+    },
+    {
+      "question": "L'action de contrôleur a la signature `show(Task $task)` et la route `/api/tasks/{id}`. Que se passe-t-il pour `GET /api/tasks/999` si la tâche 999 n'existe pas ?",
+      "choices": [
+        "`$task` vaut `null` et il faut tester ce cas dans la méthode",
+        "Une erreur 500, car l'objet ne peut pas être construit",
+        "Symfony répond 404 avant même d'entrer dans la méthode",
+        "Symfony crée une tâche vide avec l'id 999"
+      ],
+      "answer": 2,
+      "explanation": "Pendant la résolution des arguments, Symfony charge l'entité depuis la base à partir de `{id}`. Si elle n'existe pas, il lève une 404. C'est plus que `route.params.id` : on reçoit directement l'objet."
+    },
+    {
+      "question": "Le formulaire Vue valide déjà le titre avec zod (ou vee-validate). Faut-il quand même des contraintes `#[Assert\\…]` sur le DTO côté Symfony ?",
+      "choices": [
+        "Oui : n'importe qui peut appeler l'API avec `curl` ; la validation front est un confort pour l'utilisateur, celle du serveur protège les données",
+        "Non : valider deux fois est une duplication à éviter",
+        "Non : Symfony relit automatiquement les schémas zod du front",
+        "Seulement en environnement `prod`"
+      ],
+      "answer": 0,
+      "explanation": "La validation qui compte est celle du serveur. Avec `#[MapRequestPayload]`, le JSON est converti en DTO puis validé ; en cas d'échec, Symfony répond automatiquement 422 avec la liste des `violations`, que le front peut afficher."
+    },
+    {
+      "question": "Le back doit appeler un service tiers avec une clé d'API secrète. Quelles pratiques sont correctes ? (plusieurs réponses)",
+      "choices": [
+        "La mettre dans une variable `VITE_API_KEY` du front et l'envoyer au back",
+        "La définir côté serveur, dans `.env.local` (non commité) ou en vraie variable d'environnement / secret Symfony",
+        "Écrire la vraie valeur de production dans le `.env` commité",
+        "La lire dans la configuration avec `%env(...)%` puis l'injecter dans le service qui en a besoin"
+      ],
+      "answer": [
+        1,
+        3
+      ],
+      "explanation": "Tout ce qui est `VITE_*` finit dans le bundle JavaScript, lisible par n'importe quel visiteur. Côté Symfony, les variables d'environnement restent sur le serveur et sont lues à l'exécution, pas au build. Le `.env` commité ne contient que des valeurs par défaut de dev."
+    },
+    {
+      "question": "Quelles affirmations sur `APP_ENV` sont vraies ? (plusieurs réponses)",
+      "choices": [
+        "En `dev` : profiler, erreurs détaillées, recompilation automatique",
+        "En `prod` : erreurs génériques et cache figé",
+        "Comme `import.meta.env`, la valeur est figée au moment du build",
+        "En `test` : utilisé par PHPUnit, avec la base `taskboard_test`"
+      ],
+      "answer": [
+        0,
+        1,
+        3
+      ],
+      "explanation": "`APP_ENV` est l'équivalent de `import.meta.env.DEV` / `PROD`, mais il change aussi la configuration chargée (sections `when@dev`, `when@prod`). Il est lu à l'exécution, sur le serveur."
+    },
+    {
+      "question": "Vous avez modifié une valeur dans `.env` et Symfony continue d'utiliser l'ancienne. Quelle est la cause la plus probable ?",
+      "choices": [
+        "Il faut relancer `npm run build`",
+        "Le conteneur et la configuration sont compilés dans `var/cache/` : vider le cache avec `make sf-cc`",
+        "Le navigateur a mis la réponse en cache",
+        "Il faut lancer `composer update`"
+      ],
+      "answer": 1,
+      "explanation": "Symfony compile le conteneur et les routes en PHP dans `var/cache/`. En dev, la recompilation est automatique pour la plupart des fichiers, mais un comportement « fantôme » se règle avec `make sf-cc`."
+    },
+    {
+      "question": "En cherchant de l'aide (doc, forum ou assistant IA), vous obtenez un exemple qui utilise `services.yml`, un `AppBundle` et des annotations en commentaires. Que faut-il en penser ?",
+      "choices": [
+        "C'est la syntaxe recommandée de Symfony 7.4",
+        "C'est équivalent, les deux syntaxes sont interchangeables",
+        "C'est du Laravel",
+        "L'exemple date probablement de Symfony 3 ou 4 : vérifier dans la doc de la 7.4 et préciser la version dans ses recherches"
+      ],
+      "answer": 3,
+      "explanation": "Le projet utilise Symfony 7.4 LTS. Beaucoup d'exemples en ligne (et de réponses générées) datent d'anciennes versions : précisez toujours la version, et comparez avec https://symfony.com/doc/7.4/."
+    }
+  ],
+  "openQuestions": [
+    "Raconte le trajet d'une requête `POST /api/tasks` dans Symfony, de `public/index.php` à la réponse 201 : événements du kernel, résolution des arguments, contrôleur, sérialisation. À quoi chaque étape correspond-elle dans Express ou dans Vue ?",
+    "Pour chaque fichier de ton API PHP pur (index.php, Router, Request/JsonResponse, HttpException, Connection, TaskRepository, TaskValidator, Task::jsonSerialize), indique ce qui le remplace dans Symfony.",
+    "Explique l'autowiring à un collègue Vue en partant de `provide`/`inject` : comment Symfony sait-il quoi injecter dans le constructeur de TaskController, combien de temps vit un service, et pourquoi ce n'est pas un store Pinia ?",
+    "Où mettrais-tu une clé d'API secrète, et pourquoi jamais dans une variable `VITE_*` ? Suis son chemin depuis le fichier d'environnement jusqu'au service qui l'utilise."
+  ]
+}

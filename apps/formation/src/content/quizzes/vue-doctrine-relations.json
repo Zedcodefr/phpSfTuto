@@ -1,0 +1,149 @@
+{
+  "id": "vue-doctrine-relations",
+  "title": "Doctrine : relations",
+  "questions": [
+    {
+      "question": "Dans la relation Book ↔ Author du kata, quel est le côté propriétaire ?",
+      "code": "<?php\n// Book\n#[ORM\\ManyToOne(inversedBy: 'books')]\n#[ORM\\JoinColumn(nullable: false)]\nprivate Author $author;\n\n// Author\n#[ORM\\OneToMany(targetEntity: Book::class, mappedBy: 'author')]\nprivate Collection $books;",
+      "choices": [
+        "Author, car il « possède » ses livres",
+        "Les deux : Doctrine lit les deux propriétés au flush()",
+        "Book : c'est le ManyToOne, celui qui a la clé étrangère author_id dans sa table",
+        "Celui qui est déclaré en premier dans le code"
+      ],
+      "answer": 2,
+      "explanation": "Moyen mnémotechnique : le propriétaire est celui qui a la clé étrangère dans sa table. Dans un couple ManyToOne / OneToMany, c'est toujours le ManyToOne ; le côté inverse porte mappedBy."
+    },
+    {
+      "question": "Combien d'UPDATE ce code produit-il ?",
+      "code": "<?php\n$murakami->getBooks()->removeElement($book);\n$atwood->getBooks()->add($book);\n$em->flush();",
+      "choices": [
+        "0 : seul le côté inverse a été modifié, et Doctrine ne le lit jamais au flush()",
+        "1 : author_id du livre devient l'id d'Atwood",
+        "2 : un par auteur",
+        "Une exception est levée au flush()"
+      ],
+      "answer": 0,
+      "explanation": "Dans un store Pinia, pousser un élément dans un tableau suffit à changer l'état. Ici la vérité est dans une colonne SQL, et seule la propriété qui correspond à cette colonne (Book::$author) compte : il faut appeler $book->setAuthor($atwood)."
+    },
+    {
+      "question": "Si seul le côté propriétaire compte pour la base, pourquoi `Book::setAuthor()` met-il aussi à jour la collection des auteurs ?",
+      "choices": [
+        "C'est obligatoire, sinon flush() échoue",
+        "Pour déclencher les cascades",
+        "Pour éviter le chargement paresseux",
+        "Pour que les objets restent cohérents en mémoire pendant la requête : sinon $author->getBooks() renvoie une liste fausse jusqu'au prochain chargement"
+      ],
+      "answer": 3,
+      "explanation": "C'est la même idée qu'une action Pinia qui met à jour deux morceaux d'état d'un coup pour qu'ils restent cohérents. make sf-entity génère ces méthodes addX / removeX pour une relation bidirectionnelle."
+    },
+    {
+      "question": "Quelles correspondances entre tableau JS et Collection Doctrine sont justes ? (plusieurs réponses)",
+      "choices": [
+        "arr.push(x) ↔ $col->add($x)",
+        "arr.includes(x) ↔ $col->contains($x)",
+        "arr.length ↔ $col->length",
+        "arr.some(fn) ↔ $col->exists(fn)"
+      ],
+      "answer": [
+        0,
+        1,
+        3
+      ],
+      "explanation": "La taille s'obtient avec $col->count() (ou count($col)). Retenez aussi removeElement() pour retirer, et toArray() / getValues() pour revenir à un tableau PHP."
+    },
+    {
+      "question": "Sur une entité chargée depuis la base, pourquoi cette ligne est-elle à proscrire ?",
+      "code": "<?php\n$this->reviews = new ArrayCollection([$review1, $review2]);",
+      "choices": [
+        "ArrayCollection n'accepte pas de tableau en argument",
+        "Remplacer la collection fait perdre à Doctrine le suivi de la collection chargée : il faut modifier l'existante avec add(), removeElement() ou clear()",
+        "Cela déclenche immédiatement deux INSERT",
+        "Ce n'est un problème que pour les relations ManyToMany"
+      ],
+      "answer": 1,
+      "explanation": "Même réflexe qu'en Vue avec un reactive() : on mute le contenu, on ne remplace pas la référence suivie. new ArrayCollection() ne se fait que dans le constructeur, pour une entité neuve."
+    },
+    {
+      "question": "Book::$reviews a `cascade: ['persist']` et `orphanRemoval: true`. Quelles affirmations sont vraies ? (plusieurs réponses)",
+      "choices": [
+        "orphanRemoval est une contrainte SQL exécutée par la base",
+        "Une new Review ajoutée à un livre suivi est insérée au flush() sans persist()",
+        "Retirer une critique de la collection puis flush() la supprime en base",
+        "Supprimer un auteur supprime automatiquement ses livres"
+      ],
+      "answer": [
+        1,
+        2
+      ],
+      "explanation": "cascade et orphanRemoval agissent côté ORM, en PHP. La contrainte SQL, c'est onDelete: 'CASCADE' sur le JoinColumn. Rien ne cascade d'Author vers Book : remove($author) avec des livres échoue sur la clé étrangère."
+    },
+    {
+      "question": "Quelle ligne déclenche la requête SQL sur la table kata_author ?",
+      "code": "<?php\n$book = $bookRepository->find(1);   // (A)\n$author = $book->getAuthor();       // (B)\n$name = $author->getName();         // (C)\n$json = ['author' => $name];        // (D)",
+      "choices": [
+        "(A) : find() charge toutes les relations",
+        "(B) : l'appel du getter charge la relation",
+        "(C) : l'auteur est un objet fantôme dont seul l'id est connu, il se remplit au premier accès à une propriété",
+        "Aucune : Doctrine ne charge que ce qu'on demande avec un include, comme Prisma"
+      ],
+      "answer": 2,
+      "explanation": "Par défaut les relations sont LAZY : chargées au premier accès, par une requête que vous n'avez pas écrite. Prisma fait l'inverse (rien sans include). Pratique, mais chaque accès peut cacher une requête."
+    },
+    {
+      "question": "Combien de requêtes ce code exécute-t-il sur les données du kata (9 livres, 4 auteurs différents) ?",
+      "code": "<?php\n$books = $bookRepository->findAll();\nforeach ($books as $book) {\n    echo $book->getAuthor()->getName();\n    echo count($book->getReviews());\n}",
+      "choices": [
+        "1",
+        "2 : une pour les livres, une pour les auteurs",
+        "10",
+        "14 : 1 pour les livres + 4 pour les auteurs + 9 pour les critiques"
+      ],
+      "answer": 3,
+      "explanation": "C'est le problème N+1, l'équivalent back d'une boucle de await api.get() côté front, mais invisible dans le code. L'onglet Doctrine du profiler le montre comme l'onglet Réseau des DevTools : des requêtes identiques à un paramètre près."
+    },
+    {
+      "question": "Dans ce QueryBuilder, que se passe-t-il si on retire `->addSelect('a')` ?",
+      "code": "<?php\n$this->createQueryBuilder('b')\n    ->addSelect('a')\n    ->join('b.author', 'a')\n    ->getQuery()\n    ->getResult();",
+      "choices": [
+        "La jointure ne sert plus qu'à filtrer : les auteurs ne sont pas chargés et le N+1 revient",
+        "Rien ne change : join() charge toujours la relation",
+        "La requête échoue : join() exige un addSelect()",
+        "Les auteurs sont chargés en EAGER à la place"
+      ],
+      "answer": 0,
+      "explanation": "join() + addSelect() = fetch join, ≈ include: { author: true } en Prisma. Sans addSelect(), la jointure sert à un WHERE a.country = ... mais les auteurs restent à charger un par un."
+    },
+    {
+      "question": "Le Serializer lève une CircularReferenceException sur une entité Book. Quelles solutions le cours recommande-t-il ? (plusieurs réponses)",
+      "choices": [
+        "Passer toutes les relations en fetch: 'EAGER'",
+        "Des groupes de sérialisation (#[Groups(['book:read'])]) qui n'incluent pas la relation inverse",
+        "Supprimer le côté propriétaire de la relation",
+        "Un DTO de sortie qui ne contient que ce que le contrat d'API demande"
+      ],
+      "answer": [
+        1,
+        3
+      ],
+      "explanation": "C'est le même problème qu'un JSON.stringify() sur deux objets qui se référencent. Groupes ou DTO (≈ un type TS dédié à la réponse d'API) cassent la boucle et évitent aussi le chargement paresseux caché pendant la génération du JSON."
+    },
+    {
+      "question": "Ticket B2 : Task a deux ManyToOne vers User (author et assignee). Que conseille le cours ?",
+      "choices": [
+        "Une seule relation ManyToMany Task ↔ User",
+        "Des relations unidirectionnelles : si on les rendait bidirectionnelles, il faudrait deux collections inverses distinctes (createdTasks, assignedTasks)",
+        "Une seule collection inverse User::$tasks pour les deux relations",
+        "Mettre le côté propriétaire dans User"
+      ],
+      "answer": 1,
+      "explanation": "Une relation n'a pas besoin d'être dans les deux sens. Si on n'a jamais besoin de $user->getTasks(), une requête suffit : moins de code, moins de pièges."
+    }
+  ],
+  "openQuestions": [
+    "Pour chaque relation de ton ticket, indique le côté propriétaire, le côté inverse (s'il existe) et justifie le choix d'une relation bidirectionnelle ou non.",
+    "Pourquoi `$author->getBooks()->add($book)` ne suffit-il pas à changer l'auteur d'un livre, alors que pousser dans un tableau d'un store Pinia suffit à changer l'état ? Que fait ta méthode de synchronisation (ou K20) ?",
+    "Montre une liste de ton API qui affiche une relation (projet, auteur, commentaires). Combien de requêtes SQL exécute-t-elle, comment l'as-tu vérifié, et comment as-tu évité le N+1 ?",
+    "Quelle différence fais-tu entre `cascade: ['remove']`, `orphanRemoval: true` et `onDelete: 'CASCADE'` ? Lequel as-tu utilisé et pourquoi ?"
+  ]
+}

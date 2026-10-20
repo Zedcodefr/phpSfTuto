@@ -1,0 +1,157 @@
+{
+  "id": "vue-symfony-particularites",
+  "title": "Particularités de Symfony",
+  "questions": [
+    {
+      "question": "Que se passe-t-il quand vous lancez `make sf-composer c=\"require symfony/security-bundle\"` ? (plusieurs réponses)",
+      "choices": [
+        "Composer télécharge le paquet et met à jour `composer.json` et `composer.lock`",
+        "Comme un `npm install` simple, seul le dossier `vendor/` est modifié",
+        "Flex applique une recette : il branche le bundle dans `config/bundles.php` et crée `config/packages/security.yaml`",
+        "Flex note ce qu'il a fait dans `symfony.lock`, à commiter"
+      ],
+      "answer": [
+        0,
+        2,
+        3
+      ],
+      "explanation": "Une recette Flex modifie votre projet, comme un `vue add` ou un `nuxi module add` : le paquet ne fait pas que s'installer, il se branche. Lisez toujours le `git diff` après un `composer require`."
+    },
+    {
+      "question": "Le site est déployé en `prod` avec une nouvelle route. La route n'existe pas pour Symfony. Pourquoi ?",
+      "choices": [
+        "En prod, le cache compilé (conteneur, routes) n'est jamais recompilé automatiquement : il faut `cache:clear` à chaque déploiement",
+        "Les routes ne fonctionnent qu'en `dev`",
+        "Il faut redémarrer nginx après chaque modification",
+        "La route doit aussi être déclarée dans le routeur du front Vue"
+      ],
+      "answer": 0,
+      "explanation": "Symfony compile la configuration en PHP dans `var/cache/` (un peu le `vite build` de la configuration). En dev, la recompilation est automatique quand un fichier surveillé change ; en prod, jamais."
+    },
+    {
+      "question": "Deux classes implémentent l'interface `Clock`. Le constructeur d'un service demande un `Clock`. Que faut-il faire ?",
+      "choices": [
+        "Rien : l'autowiring choisit la première classe trouvée",
+        "Déclarer laquelle utiliser, par exemple avec `#[AsAlias(Clock::class)]` sur `SystemClock`",
+        "Remplacer le type par `object`",
+        "Appeler `$container->get(SystemClock::class)` dans le constructeur"
+      ],
+      "answer": 1,
+      "explanation": "Avec une seule implémentation, l'autowiring devine. Avec deux, il faut un alias : c'est l'équivalent de `provide(ClockKey, new SystemClock())` en Vue, ou de `{ provide: Clock, useClass: SystemClock }` en NestJS. Récupérer un service dans le conteneur à la main (service locator) est un anti-pattern."
+    },
+    {
+      "question": "Ce constructeur provoque une erreur d'autowiring. Pourquoi, et comment la corriger ?",
+      "code": "<?php\npublic function __construct(\n    private string $projectDir,\n) {}",
+      "choices": [
+        "Il faut rendre la propriété `public`",
+        "Les services ne peuvent pas recevoir de chaîne",
+        "Il faut une valeur par défaut `= ''`",
+        "Le conteneur ne peut pas deviner une valeur scalaire d'après son type : il faut `#[Autowire('%kernel.project_dir%')]` (ou un `bind` dans `services.yaml`)"
+      ],
+      "answer": 3,
+      "explanation": "L'autowiring injecte d'après le type : ça marche pour une classe ou une interface, pas pour une `string` ou un `int`. On indique la valeur avec `#[Autowire]` (paramètre, `env:`, ou `service:`) ou globalement avec `bind`."
+    },
+    {
+      "question": "Combien de requêtes SQL ce code exécute-t-il ?",
+      "code": "<?php\n$task = $repo->find(1);\n$same = $repo->find(1);\n$task->rename('Nouveau');\n$em->flush();",
+      "choices": [
+        "4",
+        "3",
+        "2 : un SELECT, puis un UPDATE au flush",
+        "1"
+      ],
+      "answer": 2,
+      "explanation": "Le deuxième `find(1)` renvoie la même instance sans requête (identity map). Modifier l'objet n'écrit rien : c'est `flush()` qui envoie tous les changements. À l'inverse de Prisma, où chaque `update` part tout de suite."
+    },
+    {
+      "question": "Après avoir ajouté `project` à `Task` et `tasks` à `Project`, `$this->json($task)` lève une `CircularReferenceException`. Quelles solutions sont prévues par le projet ? (plusieurs réponses)",
+      "choices": [
+        "Des groupes de sérialisation (`#[Groups(['task:read'])]`), sans le groupe sur `Project::getTasks()`",
+        "Un DTO de sortie construit à la main, comme `TaskOutput::fromEntity($task)`",
+        "Passer par `JSON.stringify` côté front",
+        "Supprimer la relation entre `Task` et `Project`"
+      ],
+      "answer": [
+        0,
+        1
+      ],
+      "explanation": "C'est le `TypeError: Converting circular structure to JSON` de `JSON.stringify`. On coupe la boucle soit en choisissant les attributs exportés (groupes), soit avec un objet de sortie explicite, comme un type `TaskDto` en TypeScript. Une équipe choisit l'une des deux approches."
+    },
+    {
+      "question": "Depuis que vous passez `context: ['groups' => ['task:read']]`, la réponse JSON ne contient plus `id`. Pourquoi ?",
+      "choices": [
+        "Le Serializer n'exporte jamais les identifiants",
+        "Dès qu'un groupe est passé, seuls les attributs portant ce groupe sont exportés : il faut ajouter `#[Groups(['task:read'])]` sur `getId()`",
+        "`id` est privé dans l'entité",
+        "Il faut vider le cache"
+      ],
+      "answer": 1,
+      "explanation": "Les groupes fonctionnent en liste blanche. N'oubliez pas d'annoter `getId()`, sinon le front Vue reçoit des tâches sans identifiant."
+    },
+    {
+      "question": "L'entité `Project` possède une méthode publique `getTaskCount(): int`. Que produit `$this->json($project)` ?",
+      "choices": [
+        "Rien de plus : seules les propriétés sont exportées",
+        "Une clé `getTaskCount`",
+        "Une clé `taskCount` avec la valeur calculée",
+        "Une erreur, car `taskCount` n'est pas une colonne"
+      ],
+      "answer": 2,
+      "explanation": "Le Serializer normalise l'objet via ses getters : `getXxx()`, `isXxx()` et `hasXxx()` sont exportés sous le nom `xxx`. Une méthode calculée donne donc un champ gratuit, un peu comme un `computed` exposé."
+    },
+    {
+      "question": "Le nom d'un projet doit être unique en base. Où placer cette règle de validation ?",
+      "choices": [
+        "`#[UniqueEntity('name')]` sur l'entité, ou une contrainte personnalisée sur le DTO dont le validateur (un service) interroge le repository",
+        "`#[Assert\\Length(max: 255)]` sur le DTO",
+        "Uniquement dans le formulaire Vue, avec un appel à l'API avant l'envoi",
+        "Dans le repository, au moment du `flush()`"
+      ],
+      "answer": 0,
+      "explanation": "L'unicité dépend de la base, donc d'un service. `UniqueEntity` ne s'applique qu'à une entité : comme le DTO n'en est pas une, on écrit une contrainte personnalisée (`make:validator`) dans laquelle on injecte le repository. Le check côté Vue reste un confort, pas une protection."
+    },
+    {
+      "question": "Quelles affirmations sur les erreurs JSON de l'API sont vraies ? (plusieurs réponses)",
+      "choices": [
+        "`throw $this->createNotFoundException('Project 3 not found')` produit une 404 au format problem details",
+        "`throw new \\RuntimeException('...')` produit une 400",
+        "En prod, `detail` ne contient que le texte HTTP standard, sans le message ni la trace",
+        "Il faut mettre `format: 'json'` sur la route de chaque contrôleur d'API"
+      ],
+      "answer": [
+        0,
+        2,
+        3
+      ],
+      "explanation": "Toute exception qui n'implémente pas `HttpExceptionInterface` donne une 500. Comme le `detail` diffère entre dev et prod, ne mettez jamais d'information sensible dans les messages, et ne testez pas sa valeur exacte."
+    },
+    {
+      "question": "Le bouton « Supprimer » est masqué par `v-if=\"isAdmin\"`. Côté API, quelles réponses le contrat attend-il pour (1) une requête sans token, (2) un token valide mais sans le droit de supprimer ?",
+      "choices": [
+        "(1) 403, (2) 401",
+        "(1) 401, (2) 404",
+        "(1) 401, (2) 403",
+        "(1) 400, (2) 403"
+      ],
+      "answer": 2,
+      "explanation": "Non authentifié → 401 ; authentifié mais refusé → 403. Le `v-if` cache un bouton, il ne protège rien : n'importe qui peut appeler `DELETE` avec `curl`. La décision se prend côté serveur (`access_control`, `#[IsGranted]`, voter)."
+    },
+    {
+      "question": "Le DTO `UpdateTaskInput` a tous ses champs à `null` par défaut. Pourquoi est-il impossible, en l'état, d'effacer la description avec un PATCH `{\"description\": null}` ?",
+      "choices": [
+        "Symfony refuse les valeurs `null` dans un JSON",
+        "Une fois le JSON transformé en DTO, « clé absente » et « `null` explicite » sont indiscernables : les deux donnent `null`",
+        "Doctrine interdit les colonnes nullables",
+        "Il faudrait une requête `PUT`"
+      ],
+      "answer": 1,
+      "explanation": "En JS, on ferait `'description' in body`. Ici, il faut retrouver l'information : regarder les clés du JSON brut (`array_key_exists` sur `$request->toArray()`), un DTO qui mémorise les champs fournis, ou `OBJECT_TO_POPULATE` (≈ `Object.assign(currentValues, body)`)."
+    }
+  ],
+  "openQuestions": [
+    "Après un `composer require`, que regardes-tu dans le `git diff`, et pourquoi ? En quoi est-ce différent d'un simple `npm install` ?",
+    "Comment as-tu évité les références circulaires lors de la sérialisation : groupes ou DTO de sortie ? Fais le lien avec l'erreur « Converting circular structure to JSON » de `JSON.stringify`, et justifie ton choix.",
+    "Comment ton code gère-t-il un PATCH qui envoie explicitement `null` sur un champ ? Pourquoi n'est-ce pas aussi simple que `'description' in body` en JavaScript, et quelle solution as-tu retenue ?",
+    "Un collègue dit : « on a déjà le `v-if=\"isAdmin\"` et la validation vee-validate dans le front, inutile de le refaire dans Symfony ». Que lui réponds-tu, avec les codes HTTP attendus et les lignes de ton code qui protègent réellement les données ?"
+  ]
+}

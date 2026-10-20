@@ -1,0 +1,86 @@
+{
+  "id": "react-principes",
+  "title": "Principes de React",
+  "questions": [
+    {
+      "question": "Que se passe-t-il quand on clique sur le bouton ?",
+      "code": "export function Counter() {\n  let count = 0\n  return <button onClick={() => { count++ }}>Cliqué {count} fois</button>\n}",
+      "language": "tsx",
+      "choices": ["L'affichage passe à 1, 2, 3…", "L'affichage reste à 0 : une variable locale ne déclenche pas de rendu et est recréée à chaque rendu", "Erreur de compilation", "L'affichage passe à 1 puis reste bloqué"],
+      "answer": 1,
+      "explanation": "Seul un setter d'état (useState) programme un nouveau rendu. Les variables locales sont recréées à chaque exécution de la fonction composant."
+    },
+    {
+      "question": "Ce composant affiche « 0 » quand la liste est vide. Pourquoi ?",
+      "code": "<div>\n  {tasks.length && <TaskList tasks={tasks} />}\n</div>",
+      "language": "tsx",
+      "choices": ["TaskList affiche 0 quand la liste est vide", "`0 && …` vaut 0, et React affiche le nombre 0 (il n'affiche rien seulement pour false, null, undefined)", "C'est un bug de React 19", "Il faut une key sur TaskList"],
+      "answer": 1,
+      "explanation": "Utilisez une vraie condition booléenne : `{tasks.length > 0 && <TaskList … />}`."
+    },
+    {
+      "question": "Un composant enfant `TaskItem` veut marquer sa tâche comme terminée. Comment fait-on en React ?",
+      "choices": ["Il modifie `props.task.status` directement", "Il appelle une fonction reçue en props (ex. `onStatusChange`) et c'est le parent, propriétaire de l'état, qui le met à jour", "Il utilise un two-way binding `@bind`", "Il recharge la page"],
+      "answer": 1,
+      "explanation": "Les props sont en lecture seule : les données descendent, les événements remontent par des callbacks. L'état vit dans le composant qui le possède."
+    },
+    {
+      "question": "Ce code TypeScript compile. Que garantit `as Task[]` à l'exécution ?",
+      "code": "const data = (await response.json()) as Task[]",
+      "language": "ts",
+      "choices": ["Que la réponse a bien la forme de Task[], sinon une exception est levée", "Rien : c'est une promesse faite au compilateur, les types sont effacés au runtime", "Que chaque objet est converti en instance de Task", "Que le statut HTTP est 200"],
+      "answer": 1,
+      "explanation": "Les types TypeScript disparaissent à la compilation. Si l'API ne respecte pas le contrat, le bug apparaîtra plus loin. D'où l'importance de make php-check côté back."
+    },
+    {
+      "question": "Quel est l'équivalent React de `OnInitializedAsync()` en Blazor pour charger les tâches au premier affichage ?",
+      "choices": ["Appeler fetch directement dans le corps de la fonction composant", "`useEffect(() => { … }, [])`", "`useEffect(() => { … })` sans second argument", "`useState(fetch('/api/tasks'))`"],
+      "answer": 1,
+      "explanation": "Le tableau de dépendances vide exécute l'effet après le premier rendu seulement. Sans tableau, l'effet s'exécute après CHAQUE rendu. Un fetch dans le corps serait relancé à chaque rendu (le rendu doit être pur)."
+    },
+    {
+      "question": "Pourquoi `fetch('/api/tasks')` fonctionne-t-il sans URL d'API en dur et sans problème de CORS ?",
+      "choices": ["Le navigateur devine l'URL de l'API", "Vite (port 5173) redirige les URL commençant par /api vers l'API choisie : pour le navigateur, c'est la même origine", "L'API PHP envoie des en-têtes CORS", "React ajoute automatiquement le préfixe http://localhost:8081"],
+      "answer": 1,
+      "explanation": "Le proxy de vite.config.ts relaie /api vers api-php ou nginx-symfony (make use-php / use-symfony). En production, un reverse proxy joue le même rôle."
+    },
+    {
+      "question": "Dans TaskList.tsx, pourquoi tester `response.ok` après `fetch` ?",
+      "choices": ["Parce que fetch ne lève PAS d'erreur sur une réponse 404 ou 500 : seule une erreur réseau rejette la promesse", "Parce que response.json() échoue toujours sinon", "C'est inutile, fetch lève une exception sur tout code ≠ 2xx", "Pour vérifier que le JSON est valide"],
+      "answer": 0,
+      "explanation": "Contrairement à HttpClient.GetFromJsonAsync en .NET (qui appelle EnsureSuccessStatusCode), fetch résout la promesse pour toute réponse HTTP. Il faut vérifier le statut soi-même."
+    },
+    {
+      "question": "Quelles affirmations sur le typage TypeScript sont vraies ? (plusieurs réponses)",
+      "code": "type Task = { id: number; title: string }\ntype Ticket = { id: number; title: string }\n\nconst t: Task = { id: 1, title: 'A' }\nconst k: Ticket = t",
+      "language": "ts",
+      "choices": ["Ce code compile : le typage est structurel, seule la forme compte", "Il faut un `new Task()` pour créer t", "`type Status = 'todo' | 'done'` remplace avantageusement un enum : la valeur est directement celle du JSON", "Une `interface` TypeScript doit être implémentée par une classe, comme en C#"],
+      "answer": [0, 2],
+      "explanation": "TypeScript est structurel (C# est nominal). Les unions de littéraux sont l'idiome du projet. Une interface TS décrit seulement une forme, on n'écrit quasiment pas de classes en React."
+    },
+    {
+      "question": "Une liste filtrée (`tasks.filter(t => t.status === filter)`) doit-elle être stockée dans un état ?",
+      "choices": ["Oui, dans un useState mis à jour par un useEffect qui surveille tasks et filter", "Non : c'est une valeur dérivée, on la calcule directement dans le rendu", "Oui, sinon elle n'est pas réactive", "Seulement si la liste dépasse 100 éléments"],
+      "answer": 1,
+      "explanation": "Le composant est ré-exécuté à chaque changement d'état : la valeur dérivée est donc toujours à jour. La dupliquer dans un état ajoute un rendu inutile et un risque d'incohérence."
+    },
+    {
+      "question": "Comment écrit-on un champ texte lié à l'état (l'équivalent de `@bind` en Blazor) ?",
+      "choices": [
+        "`<input bind={title} />`",
+        "`<input value={title} onChange={(e) => setTitle(e.target.value)} />`",
+        "`<input value={title} />` suffit",
+        "`<input defaultValue={title} onChange={setTitle} />`"
+      ],
+      "answer": 1,
+      "explanation": "Pas de two-way binding : value descend depuis l'état, onChange remonte la saisie. Avec value seul, le champ est bloqué (React impose la valeur de l'état)."
+    }
+  ],
+  "openQuestions": [
+    "Raconte ce qui se passe, rendu par rendu, entre l'ouverture de la page et l'affichage des tâches dans TaskList (états initiaux, effet, réponse, nouveau rendu).",
+    "Explique à un dev WPF/Blazor le principe « UI = f(état) » : que fait React quand tu appelles un setter d'état ?",
+    "Dans ton code, montre un composant qui reçoit une fonction en props. Qui possède l'état, qui le modifie, et pourquoi ?",
+    "Pourquoi le front n'a-t-il jamais l'URL de l'API en dur ? Explique le trajet d'un appel `/api/tasks` jusqu'à l'API Symfony.",
+    "Qu'est-ce qui garantit, et qu'est-ce qui ne garantit pas, que les données reçues respectent ton type `Task` ?"
+  ]
+}

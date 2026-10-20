@@ -1,0 +1,152 @@
+{
+  "id": "vue-doctrine-dql",
+  "title": "Doctrine : DQL & QueryBuilder",
+  "questions": [
+    {
+      "question": "Ce code renvoie la bonne page de tâches. Quel est le problème ?",
+      "code": "<?php\n$tasks = $taskRepository->findAll();\n$todo  = array_filter($tasks, fn (Task $t) => $t->getStatus() === TaskStatus::Todo);\n$page  = array_slice($todo, ($page - 1) * $limit, $limit);",
+      "choices": [
+        "array_filter ne fonctionne pas sur des entités",
+        "Aucun, c'est la méthode recommandée pour garder le repository simple",
+        "Toutes les tâches sont chargées, hydratées et suivies par l'Unit of Work pour en jeter la plupart : filtrer et paginer doit se faire en base (WHERE, LIMIT / OFFSET)",
+        "findAll() ne renvoie que les 100 premières lignes"
+      ],
+      "answer": 2,
+      "explanation": "C'est l'équivalent de télécharger 10 000 lignes dans le navigateur pour faire un .filter().slice(). Ça marche avec 4 tâches de démo, ça s'effondre avec les vraies données. La base a des index et ne renvoie que les lignes utiles."
+    },
+    {
+      "question": "Quelles affirmations sur le DQL sont vraies ? (plusieurs réponses)",
+      "choices": [
+        "Il est vérifié avant l'exécution, avec autocomplétion typée comme le client Prisma",
+        "On y manipule des classes et des propriétés (b.publishedAt), jamais des tables ni des colonnes",
+        "Une jointure s'écrit sur une relation (JOIN b.author a) sans clause ON : Doctrine connaît la clé",
+        "SELECT b FROM ...Book b renvoie des tableaux associatifs, comme PDO"
+      ],
+      "answer": [
+        1,
+        2
+      ],
+      "explanation": "Le DQL est une chaîne de caractères : une faute de frappe (titel) n'apparaît qu'à l'exécution, d'où l'intérêt des tests. SELECT b renvoie des objets Book."
+    },
+    {
+      "question": "Quel DQL ce QueryBuilder produit-il ?",
+      "code": "<?php\n$qb = $this->createQueryBuilder('t')\n    ->where('t.id > 1')\n    ->where('t.name = :n');",
+      "choices": [
+        "SELECT t FROM ...Tag t WHERE t.id > 1 AND t.name = :n",
+        "SELECT t FROM ...Tag t WHERE t.id > 1 OR t.name = :n",
+        "Une exception : where() ne peut être appelé qu'une fois",
+        "SELECT t FROM ...Tag t WHERE t.name = :n"
+      ],
+      "answer": 3,
+      "explanation": "where() écrase les conditions précédentes, andWhere() les complète. Même logique pour select() / addSelect() et orderBy() / addOrderBy(). Règle simple : andWhere() partout, et getDQL() pour vérifier."
+    },
+    {
+      "question": "Le formulaire Vue n'accepte que des lettres dans le champ de recherche. Cette requête est-elle acceptable ?",
+      "code": "<?php\n$em->createQuery(\"SELECT t FROM App\\Kata\\Entity\\Tag t WHERE t.name = '$name'\");",
+      "choices": [
+        "Non : c'est une injection, et ça casse au premier nom contenant une apostrophe. La valeur vient du client et n'est jamais de confiance : setParameter()",
+        "Oui, puisque le front valide déjà la saisie",
+        "Oui, le DQL échappe automatiquement les variables interpolées",
+        "Non, mais uniquement parce que le DQL interdit les guillemets simples"
+      ],
+      "answer": 0,
+      "explanation": "N'importe qui peut appeler l'API sans passer par le formulaire (curl, DevTools). Même règle qu'avec PDO : paramètres nommés (:name) ou positionnels (?1), jamais de concaténation."
+    },
+    {
+      "question": "Pour une recherche « contient » insensible à la casse, où placer les `%` ?",
+      "code": "<?php\n$qb->andWhere('LOWER(b.title) LIKE :pattern')\n   ->setParameter('pattern', ???);",
+      "choices": [
+        "Dans la requête : LIKE '%:pattern%'",
+        "Dans la valeur du paramètre : '%' . mb_strtolower($text) . '%'",
+        "Nulle part : LIKE ajoute les % tout seul",
+        "Dans la requête : LIKE CONCAT('%', :pattern, '%') est la seule syntaxe acceptée"
+      ],
+      "answer": 1,
+      "explanation": "Un paramètre est une valeur entière : '%:pattern%' n'est pas un paramètre mais du texte. Les % font partie de la valeur passée à setParameter()."
+    },
+    {
+      "question": "Recherche de livres avec un filtre facultatif `?outOfPrint=false`. Quel est le bug ?",
+      "code": "<?php\n// ?bool $outOfPrint : null si absent de la query string\nif ($outOfPrint) {\n    $qb->andWhere('b.outOfPrint = :oop')->setParameter('oop', $outOfPrint);\n}",
+      "choices": [
+        "andWhere() ne peut pas être appelé dans un if",
+        "Un booléen ne peut pas être passé en paramètre",
+        "Il n'y en a pas",
+        "Avec outOfPrint=false, la condition est ignorée et tous les livres sont renvoyés : il faut tester null !== $outOfPrint"
+      ],
+      "answer": 3,
+      "explanation": "false n'est pas null. C'est le même piège qu'en JS avec if (params.outOfPrint). On ajoute une condition par filtre présent, comme on construit un objet params côté front."
+    },
+    {
+      "question": "Une recherche renvoie les auteurs avec leur nombre de livres de plus de 500 pages. Pourquoi les auteurs sans pavé disparaissent-ils du résultat ?",
+      "code": "SELECT a.name, COUNT(b.id) AS nb\nFROM App\\Kata\\Entity\\Author a\nLEFT JOIN a.books b\nWHERE b.pages > 500\nGROUP BY a.id",
+      "language": "sql",
+      "choices": [
+        "COUNT() ignore les auteurs sans livre",
+        "Un WHERE sur la table de droite transforme le LEFT JOIN en INNER JOIN : la condition doit aller dans le WITH (LEFT JOIN a.books b WITH b.pages > 500)",
+        "Il manque un DISTINCT",
+        "GROUP BY a.id supprime les groupes vides"
+      ],
+      "answer": 1,
+      "explanation": "Pour un auteur sans pavé, b.pages vaut NULL après le LEFT JOIN, et NULL > 500 n'est pas vrai : la ligne est éliminée. Dans le WITH, la condition filtre la jointure, pas le résultat. Même piège qu'en SQL."
+    },
+    {
+      "question": "Quelle méthode utiliser pour récupérer le résultat d'un `SELECT COUNT(b.id) FROM ...Book b` ?",
+      "choices": [
+        "getResult()",
+        "getArrayResult()",
+        "getOneOrNullResult()",
+        "getSingleScalarResult()"
+      ],
+      "answer": 3,
+      "explanation": "getSingleScalarResult() renvoie directement la valeur (9). getResult() renverrait une liste de lignes, getOneOrNullResult() une ligne ou null. À noter : COUNT() revient en int, mais AVG() en string avec PostgreSQL : convertissez avant de renvoyer du JSON, sinon le front devra faire un Number()."
+    },
+    {
+      "question": "On veut 3 livres avec leurs critiques. Le résultat ne lève pas d'erreur, mais un livre n'a qu'une critique au lieu de 3. Pourquoi ?",
+      "code": "<?php\n$this->createQueryBuilder('b')\n    ->leftJoin('b.reviews', 'r')->addSelect('r')\n    ->orderBy('b.title')\n    ->setMaxResults(3)\n    ->getQuery()->getResult();",
+      "choices": [
+        "orderBy() est incompatible avec un fetch join",
+        "Les critiques sont chargées en LAZY malgré addSelect()",
+        "LIMIT s'applique aux lignes SQL, pas aux entités : la jointure produit une ligne par critique et la coupe tombe au milieu d'un livre. Solution : le Paginator",
+        "Il faut setMaxResults(9)"
+      ],
+      "answer": 2,
+      "explanation": "Le Paginator récupère d'abord les identifiants de la page, puis charge les entités complètes de ces identifiants. count($paginator) donne aussi le total (requête COUNT séparée), utilisé pour l'en-tête X-Total-Count que le front lit pour afficher « page 2 sur 5 »."
+    },
+    {
+      "question": "Quels modes de lecture évitent de charger des entités suivies par l'Unit of Work, pour une liste en lecture seule ? (plusieurs réponses)",
+      "choices": [
+        "getArrayResult()",
+        "SELECT NEW App\\Dto\\TagStats(t.name, SIZE(t.books))",
+        "getResult() sur SELECT t FROM ...Tag t",
+        "$repo->findAll()"
+      ],
+      "answer": [
+        0,
+        1
+      ],
+      "explanation": "getArrayResult() renvoie des tableaux imbriqués, SELECT NEW des DTO (≈ un select Prisma avec un type dédié). Pas d'entité, pas de suivi, pas de risque de N+1. getResult() sur une entité et findAll() renvoient des entités suivies."
+    },
+    {
+      "question": "Après ce UPDATE DQL, quelles affirmations sont vraies ? (plusieurs réponses)",
+      "code": "<?php\n$n = $em->createQuery('UPDATE App\\Entity\\Task t SET t.status = :done WHERE t.createdAt < :limit')\n    ->setParameter('done', TaskStatus::Done)\n    ->setParameter('limit', new \\DateTimeImmutable('-1 year'))\n    ->execute();",
+      "choices": [
+        "Les entités Task déjà en mémoire gardent leurs anciennes valeurs (clear() ou refresh() si besoin)",
+        "Les listeners preUpdate sont appelés pour chaque tâche modifiée",
+        "$n contient le nombre de lignes modifiées",
+        "Une seule requête SQL est exécutée, sans charger aucune entité"
+      ],
+      "answer": [
+        0,
+        2,
+        3
+      ],
+      "explanation": "≈ prisma.task.updateMany(). Indispensable pour modifier beaucoup de lignes, mais la requête contourne l'Unit of Work : ni événements, ni cascade, ni orphanRemoval. Pour quelques entités avec leur logique métier : charger, modifier, flush()."
+    }
+  ],
+  "openQuestions": [
+    "Explique K06 du kata : pourquoi `addSelect` change tout, et comment le test vérifie que les critiques sont chargées sans requête supplémentaire.",
+    "Explique K12 : pourquoi une requête UPDATE DQL plutôt que charger et modifier les livres ? Quelles en sont les conséquences sur l'Unit of Work ?",
+    "Montre la requête de filtres de ton ticket (ou K09) : comment se construit-elle quand un critère est absent ? Fais le parallèle avec l'objet `params` que tu construisais côté Vue, et lis le DQL généré à voix haute.",
+    "Explique ta pagination : comment calcules-tu l'offset, d'où vient le total `X-Total-Count` que le front affiche, et pourquoi le Paginator plutôt que `setMaxResults` seul ?"
+  ]
+}

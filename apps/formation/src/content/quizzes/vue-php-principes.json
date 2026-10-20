@@ -1,0 +1,151 @@
+{
+  "id": "vue-php-principes",
+  "title": "Principes de PHP",
+  "questions": [
+    {
+      "question": "En Node, ce compteur renvoie 1, 2, 3… à chaque appel. Voici sa traduction en PHP. Que renvoie le 3ᵉ appel ?",
+      "code": "<?php\n$counter = 0;\n$counter++;\necho json_encode(['count' => $counter]);",
+      "choices": [
+        "`{\"count\":3}`",
+        "`{\"count\":1}`",
+        "`{\"count\":0}`",
+        "Cela dépend du nombre de workers PHP-FPM"
+      ],
+      "answer": 1,
+      "explanation": "Chaque requête exécute le script de zéro, puis tout est libéré (modèle share-nothing). `$counter` est recréé à 0 à chaque appel et vaut toujours 1. Pour compter réellement, il faut un stockage hors du process : base, Redis, APCu."
+    },
+    {
+      "question": "Quelles affirmations sur le modèle share-nothing de PHP-FPM sont vraies ? (plusieurs réponses)",
+      "choices": [
+        "Une exception non attrapée ne fait échouer que la requête en cours (erreur 500), les autres continuent",
+        "On peut lancer un `setInterval()` équivalent dans index.php pour une tâche de fond périodique",
+        "Une fuite mémoire ne peut pas s'accumuler longtemps : la mémoire est libérée à chaque requête",
+        "Un cache écrit comme `const cache = new Map()` doit être remplacé par Redis, APCu ou le cache de Symfony"
+      ],
+      "answer": [
+        0,
+        2,
+        3
+      ],
+      "explanation": "Aucun process ne tourne en continu : il n'y a donc pas de tâche de fond possible dans le script (on utilise cron, une commande console ou Symfony Messenger). En contrepartie, une requête qui plante ou qui fuit n'affecte pas les autres, et tout ce qui doit durer vit hors du process."
+    },
+    {
+      "question": "Un dev JS se demande comment « attendre » le résultat de la requête SQL avant d'afficher le nombre de lignes. Que faut-il ajouter ?",
+      "code": "<?php\n$rows = $pdo->query('SELECT * FROM task')->fetchAll();\necho count($rows);",
+      "choices": [
+        "Un `await` devant `$pdo->query(...)`",
+        "Une callback de fin, comme `->then(fn ($rows) => ...)`",
+        "Envelopper l'appel dans une Promise",
+        "Rien : PHP est synchrone, la ligne suivante ne s'exécute qu'une fois la requête SQL terminée"
+      ],
+      "answer": 3,
+      "explanation": "Pas d'async, pas d'await, pas de Promise en PHP classique : tout est bloquant et le code se lit de haut en bas, dans l'ordre d'exécution."
+    },
+    {
+      "question": "Si le code PHP est bloquant, comment un serveur PHP-FPM traite-t-il plusieurs requêtes en même temps ?",
+      "choices": [
+        "Grâce à une boucle d'événements, comme Node",
+        "Grâce à un pool de workers : chacun traite une requête à la fois, du début à la fin, pendant que les autres en traitent d'autres",
+        "PHP crée un thread par appel à la base de données",
+        "Il ne peut pas : les requêtes attendent en file les unes derrière les autres"
+      ],
+      "answer": 1,
+      "explanation": "Le parallélisme vient des workers, pas du code. Pendant qu'un worker attend la base, les autres continuent. Un calcul lourd bloque un seul worker, alors qu'en Node il bloque la boucle d'événements, donc tout le monde."
+    },
+    {
+      "question": "En développement, vous modifiez un fichier PHP du projet. Que faut-il faire pour que la requête suivante utilise le nouveau code ?",
+      "choices": [
+        "Rien : il suffit d'enregistrer ; OPcache est configuré pour revalider les fichiers à chaque requête",
+        "Lancer l'équivalent de `npm run build`",
+        "Redémarrer le serveur, comme un `node server.js`",
+        "Lancer `composer install`"
+      ],
+      "answer": 0,
+      "explanation": "Il n'y a pas d'étape de build en PHP. Le fichier est compilé en opcodes et OPcache garde ces opcodes en mémoire partagée pour ne pas recompiler à chaque requête ; en dev, il vérifie si le fichier a changé."
+    },
+    {
+      "question": "Que se passe-t-il à l'exécution de ce code ?",
+      "code": "<?php\ndeclare(strict_types=1);\n\nfunction double(int $n): int { return $n * 2; }\n\ndouble(json_decode('\"5\"'));",
+      "choices": [
+        "Renvoie 10, comme en JavaScript",
+        "Renvoie \"55\"",
+        "Lève une TypeError : Argument #1 ($n) must be of type int, string given",
+        "Erreur de syntaxe au chargement du fichier"
+      ],
+      "answer": 2,
+      "explanation": "`json_decode('\"5\"')` renvoie la chaîne \"5\". En TypeScript, `tsc` ne voit rien si une donnée externe ment ; en PHP, les types sont vérifiés à chaque appel, et `strict_types=1` interdit la conversion implicite : TypeError immédiate."
+    },
+    {
+      "question": "Quelles affirmations comparant les types TypeScript et PHP sont vraies ? (plusieurs réponses)",
+      "choices": [
+        "TypeScript vérifie les types à la compilation, puis les efface : ils n'existent plus à l'exécution",
+        "PHP vérifie les types des paramètres et des retours à l'exécution, à chaque appel",
+        "Comme TypeScript, PHP accepte un objet qui « a les bonnes méthodes » même s'il ne déclare pas l'interface",
+        "Sans `declare(strict_types=1)`, PHP convertit silencieusement `\"5\"` en `5` pour un paramètre `int`"
+      ],
+      "answer": [
+        0,
+        1,
+        3
+      ],
+      "explanation": "Le typage PHP est nominal, pas structurel : une classe doit déclarer `implements`. Et `strict_types` est une directive par fichier qu'on met en tête de chaque fichier du projet. Pour l'analyse avant exécution (≈ `tsc --noEmit`), on utilise PHPStan."
+    },
+    {
+      "question": "Quelles correspondances npm → Composer sont justes ? (plusieurs réponses)",
+      "choices": [
+        "`package-lock.json` → `composer.lock`, à commiter lui aussi",
+        "`node_modules/` → `vendor/`, à commiter pour que l'équipe ait les mêmes versions",
+        "`npm install -D vitest` → `composer require --dev phpunit/phpunit`",
+        "`npx` → les exécutables de `vendor/bin/`"
+      ],
+      "answer": [
+        0,
+        2,
+        3
+      ],
+      "explanation": "Comme `node_modules/`, le dossier `vendor/` n'est jamais commité : `composer install` le recrée à partir de `composer.lock`. Les paquets viennent de Packagist, l'équivalent du registre npm."
+    },
+    {
+      "question": "Avec l'autoload PSR-4 `\"App\\\\\": \"src/\"`, dans quel fichier doit se trouver la classe `App\\Repository\\TaskRepository` ?",
+      "choices": [
+        "src/TaskRepository.php",
+        "src/App/Repository/TaskRepository.php",
+        "N'importe où dans src/, du moment qu'elle est exportée",
+        "src/Repository/TaskRepository.php"
+      ],
+      "answer": 3,
+      "explanation": "Le préfixe `App\\` correspond à `src/`, chaque segment de namespace restant est un dossier, et le nom du fichier est exactement celui de la classe (casse comprise). Il n'y a pas d'`export` en PHP."
+    },
+    {
+      "question": "Que fait la ligne `use App\\Repository\\TaskRepository;` en haut d'un fichier ?",
+      "choices": [
+        "Elle charge et exécute src/Repository/TaskRepository.php, comme un `import` ES",
+        "Elle rend la classe accessible : sans elle, la classe serait privée à son fichier",
+        "Elle permet d'écrire `TaskRepository` au lieu du nom complet ; le fichier n'est chargé par l'autoloader qu'au premier usage de la classe",
+        "Elle équivaut à `require_once 'src/Repository/TaskRepository.php'`"
+      ],
+      "answer": 2,
+      "explanation": "En JS on importe un fichier ; en PHP, `use` importe un nom de classe et n'exécute rien. C'est l'autoloader (enregistré par `vendor/autoload.php`, le seul `require` du projet) qui trouve et charge le fichier la première fois que la classe est utilisée."
+    },
+    {
+      "question": "Pour inspecter une variable pendant le développement de l'API JSON, quelles méthodes ne cassent pas la réponse envoyée au front ? (plusieurs réponses)",
+      "choices": [
+        "`var_dump($data);`",
+        "`error_log(print_r($data, true));` puis `make logs s=api-php`",
+        "Un point d'arrêt avec Xdebug, relié à l'éditeur",
+        "`echo json_encode($data);` juste avant la réponse"
+      ],
+      "answer": [
+        1,
+        2
+      ],
+      "explanation": "Tout ce qui est affiché (`echo`, `var_dump`) part dans le corps HTTP et casse le JSON. `error_log()` est l'équivalent de `console.error()` côté serveur ; Xdebug joue le rôle des points d'arrêt des DevTools."
+    }
+  ],
+  "openQuestions": [
+    "Explique à un collègue qui ne connaît que Node la différence entre un serveur Express qui tourne en continu et PHP-FPM : que se passe-t-il entre l'arrivée d'une requête et l'envoi de la réponse, et que devient la mémoire ensuite ?",
+    "Ton API doit mémoriser un résultat coûteux entre deux requêtes, et lancer une tâche de nettoyage régulière. Comment ferais-tu en Node ? Pourquoi ça ne marche pas tel quel en PHP, et que ferais-tu à la place ?",
+    "Tu crées la classe `App\\Validation\\TaskValidator` : où doit être le fichier, et que se passe-t-il exactement quand index.php fait `new TaskValidator()` pour la première fois ? En quoi est-ce différent d'un `import` ES ?",
+    "Qu'apporte `declare(strict_types=1)` par rapport à ce que fait TypeScript ? Montre un endroit de ton lot où une donnée externe (JSON, ligne PDO, paramètre de route) aurait été convertie silencieusement sans lui."
+  ]
+}

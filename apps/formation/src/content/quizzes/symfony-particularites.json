@@ -1,0 +1,79 @@
+{
+  "id": "symfony-particularites",
+  "title": "Particularités de Symfony & Doctrine",
+  "questions": [
+    {
+      "question": "Que se passe-t-il quand vous lancez `make sf-composer c=\"require symfony/security-bundle\"` ? (plusieurs réponses)",
+      "choices": ["Composer met à jour composer.json et composer.lock", "Flex applique une recette : bundle ajouté dans config/bundles.php, fichier config/packages/security.yaml créé…", "symfony.lock enregistre la recette appliquée", "Le bundle est activé uniquement après un `make sf-migrate`"],
+      "answer": [0, 1, 2],
+      "explanation": "Flex modifie votre projet comme le ferait un `dotnet add package` qui toucherait aussi Program.cs et appsettings.json. Lisez le git diff après chaque require."
+    },
+    {
+      "question": "Combien de requêtes SQL ce code exécute-t-il ?",
+      "code": "<?php\n$task = $repo->find(1);\n$same = $repo->find(1);\n$task->rename('Nouveau');\n$em->flush();",
+      "choices": ["1 SELECT et 1 UPDATE", "2 SELECT et 1 UPDATE", "2 SELECT, aucun UPDATE car il manque persist()", "1 SELECT, aucun UPDATE car il manque persist()"],
+      "answer": 0,
+      "explanation": "L'identity map renvoie la même instance pour le même id sans requête. L'entité chargée est déjà suivie : flush() détecte le changement et fait l'UPDATE. persist() ne sert qu'aux nouveaux objets."
+    },
+    {
+      "question": "Task a `#[ORM\\ManyToOne(inversedBy: 'tasks')] private ?Project $project`. Lequel de ces codes enregistre réellement l'association en base au flush() ?",
+      "choices": ["`$project->getTasks()->add($task);`", "`$task->assignTo($project);` (qui modifie Task::$project)", "Les deux", "Aucun sans `$em->persist($project)`"],
+      "answer": 1,
+      "explanation": "Doctrine ne lit que le côté PROPRIÉTAIRE (celui qui porte la clé étrangère, ici Task). Modifier seulement la collection inverse de Project ne change rien en base. Les méthodes add/remove synchronisent les deux côtés."
+    },
+    {
+      "question": "La liste de 50 tâches affiche `project.name` et le profiler montre 51 requêtes. Quel est le problème et la solution ?",
+      "choices": ["Le cache Doctrine est désactivé : activer le result cache", "N+1 dû au lazy loading : faire un fetch join (`leftJoin('t.project', 'p')->addSelect('p')`)", "Il faut passer la relation en EAGER sur toutes les entités", "Il faut appeler flush() avant la sérialisation"],
+      "answer": 1,
+      "explanation": "Chaque projet est chargé à la demande par un proxy : une requête par tâche. Le fetch join (≈ .Include()) charge tout en une requête. EAGER partout dégraderait toutes les autres requêtes."
+    },
+    {
+      "question": "Après avoir ajouté `project` à Task et `tasks` à Project, `$this->json($task)` lève une CircularReferenceException. Quelles solutions sont valables ? (plusieurs réponses)",
+      "choices": ["Des groupes de sérialisation (#[Groups]) qui n'exportent pas Project::getTasks() dans le groupe task:read", "Un DTO de sortie construit à partir de l'entité", "Retirer `format: 'json'` de la route", "Rendre la relation unidirectionnelle n'est jamais possible avec Doctrine"],
+      "answer": [0, 1],
+      "explanation": "Task → project → tasks → project… boucle. On coupe avec des groupes (attention : seuls les attributs du groupe sont exportés, id compris) ou avec un DTO explicite."
+    },
+    {
+      "question": "Avec `UpdateTaskInput` dont tous les champs valent `null` par défaut, pourquoi est-il impossible de remettre `description` à null via `{\"description\": null}` ?",
+      "choices": ["Le Serializer ignore les valeurs null", "« Absent du JSON » et « null explicite » donnent le même DTO : on ne peut pas les distinguer", "Doctrine refuse les mises à jour à null", "C'est une contrainte NotBlank implicite"],
+      "answer": 1,
+      "explanation": "C'est la limite du DTO nullable. Solutions : regarder les clés de `$request->toArray()`, un DTO qui mémorise les champs fournis, ou OBJECT_TO_POPULATE. Le ticket B1-3 demande d'en choisir une (pour projectId: null)."
+    },
+    {
+      "question": "Pourquoi le projet désérialise-t-il le JSON entrant dans des DTO plutôt que directement dans l'entité Task ?",
+      "choices": ["Doctrine interdit la désérialisation dans une entité", "Pour éviter le « mass assignment » (un client qui enverrait id ou createdAt) et séparer contrat HTTP et modèle persistant", "Pour des raisons de performance", "Parce que le Validator ne fonctionne pas sur les entités"],
+      "answer": 1,
+      "explanation": "Le DTO décrit exactement ce que le client a le droit d'envoyer ; l'entité garde ses invariants via son constructeur et ses méthodes métier."
+    },
+    {
+      "question": "Quelles affirmations sur l'autowiring sont vraies ? (plusieurs réponses)",
+      "choices": [
+        "Un paramètre `string $projectDir` ne peut pas être deviné : il faut `#[Autowire('%kernel.project_dir%')]` ou un `bind`",
+        "S'il existe deux implémentations d'une interface, il faut un alias (par exemple `#[AsAlias]`)",
+        "On récupère les services avec `$container->get()` dans les contrôleurs",
+        "Un listener déclaré avec `#[AsEventListener]` n'a besoin d'aucune configuration"
+      ],
+      "answer": [0, 1, 3],
+      "explanation": "Les services sont privés : on injecte, on ne va pas les chercher dans le conteneur (anti-pattern service locator), sauf dans les tests via static::getContainer()."
+    },
+    {
+      "question": "Une violation de contrainte d'unicité en base survient au flush(). Que devient l'EntityManager pour le reste de la requête ?",
+      "choices": ["Il continue normalement, la transaction est juste annulée", "Il est fermé : on ne peut plus l'utiliser dans cette requête — d'où l'intérêt de valider avant (UniqueEntity)", "Il réessaie automatiquement", "Il passe en lecture seule"],
+      "answer": 1,
+      "explanation": "Après une exception Doctrine, l'EntityManager est fermé. Il vaut mieux détecter le doublon avant le flush (UniqueEntity ou contrainte personnalisée) et renvoyer une 422."
+    },
+    {
+      "question": "Pour une API, quelle réponse le contrat attend-il dans ces deux cas : (1) pas de token, (2) token valide mais l'utilisateur n'est pas l'auteur de la tâche à supprimer ?",
+      "choices": ["(1) 403, (2) 401", "(1) 401, (2) 403", "(1) 401, (2) 404", "(1) 400, (2) 403"],
+      "answer": 1,
+      "explanation": "401 = non authentifié (ou token invalide), 403 = authentifié mais refusé. La décision « est-ce l'auteur ? » se code dans un voter."
+    }
+  ],
+  "openQuestions": [
+    "Explique la différence entre persist() et flush(), et pourquoi le projet fait un seul flush() par cas d'usage. Montre-le dans ton code.",
+    "Sur une relation de ton ticket (Task → Project, Task → User, Comment → Task), quel est le côté propriétaire ? Que se passe-t-il si tu modifies seulement l'autre côté ?",
+    "Comment as-tu évité les références circulaires lors de la sérialisation : groupes ou DTO de sortie ? Pourquoi ce choix ?",
+    "Montre une requête N+1 potentielle dans ton code et comment tu l'as vérifiée (profiler) puis corrigée.",
+    "Comment ton code gère-t-il un PATCH qui envoie explicitement `null` sur un champ ? Quelle solution as-tu retenue et pourquoi ?"
+  ]
+}

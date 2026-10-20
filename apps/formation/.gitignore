@@ -1,0 +1,5 @@
+node_modules
+dist
+# Générés par scripts/package.mjs
+public/downloads
+protected

@@ -1,0 +1,87 @@
+{
+  "id": "php-http",
+  "title": "PHP & HTTP",
+  "questions": [
+    {
+      "question": "Le front envoie `POST /api/tasks` avec le corps JSON `{\"title\":\"Apprendre PHP\"}`. Que contient `$_POST` ?",
+      "choices": ["`['title' => 'Apprendre PHP']`", "Un tableau vide : $_POST n'est rempli que pour les formulaires ; le JSON se lit dans php://input", "La chaîne JSON brute", "null"],
+      "answer": 1,
+      "explanation": "$_POST n'est alimenté que pour application/x-www-form-urlencoded et multipart/form-data. Pour une API JSON (et pour PATCH/DELETE), on lit file_get_contents('php://input') puis json_decode."
+    },
+    {
+      "question": "Que vaut `$data` ?",
+      "code": "<?php\n$data = json_decode('{oups', true);",
+      "choices": ["Une \\JsonException est levée", "null, silencieusement", "false", "Un tableau vide"],
+      "answer": 1,
+      "explanation": "Sans le flag JSON_THROW_ON_ERROR, json_decode renvoie null en cas d'erreur, sans exception. D'où l'usage systématique de JSON_THROW_ON_ERROR, puis la conversion de \\JsonException en 400."
+    },
+    {
+      "question": "Ce code produit un warning « Cannot modify header information - headers already sent ». Pourquoi ?",
+      "code": "<?php\nvar_dump($task);\nhttp_response_code(201);\nheader('Content-Type: application/json');\necho json_encode($task);",
+      "choices": ["http_response_code doit être appelé après header()", "Le var_dump a déjà envoyé du contenu : les en-têtes sont partis avec le premier octet du corps", "On ne peut pas envoyer de code 201 avec du JSON", "Il manque `exit;` à la fin"],
+      "answer": 1,
+      "explanation": "HTTP envoie les en-têtes avant le corps : dès le premier octet affiché, ils ne sont plus modifiables. Même effet avec un espace avant <?php ou un BOM. D'où un objet réponse envoyé une seule fois, à la fin (send())."
+    },
+    {
+      "question": "Quelle est la seule écriture sûre pour filtrer les tâches sur un statut reçu dans `?status=` ?",
+      "choices": [
+        "`$pdo->query(\"SELECT * FROM task WHERE status = '$status'\")`",
+        "`$pdo->query('SELECT * FROM task WHERE status = ' . addslashes($status))`",
+        "`$stmt = $pdo->prepare('SELECT * FROM task WHERE status = :status'); $stmt->execute(['status' => $status]);`",
+        "`$pdo->query(sprintf(\"SELECT * FROM task WHERE status = '%s'\", $status))`"
+      ],
+      "answer": 2,
+      "explanation": "Seule la requête préparée envoie la valeur séparément du SQL : elle n'est jamais interprétée. Concaténation, sprintf et addslashes laissent passer des injections SQL."
+    },
+    {
+      "question": "On veut trier selon `?sort=title` ou `?sort=created_at`. Pourquoi `ORDER BY :sort` dans une requête préparée ne marche-t-il pas ?",
+      "choices": ["PDO ne supporte pas ORDER BY", "Les paramètres ne remplacent que des valeurs, pas des noms de colonnes : il faut une liste blanche", "Il faut un paramètre positionnel `?` au lieu de `:sort`", "Il faut activer ATTR_EMULATE_PREPARES"],
+      "answer": 1,
+      "explanation": "Un paramètre est une valeur littérale : ORDER BY 'title' trie sur une constante. Pour un nom de colonne ou un mot-clé, on vérifie la saisie contre une liste blanche (match) avant de l'insérer dans le SQL."
+    },
+    {
+      "question": "Que renvoie `$stmt->fetch()` quand aucune ligne ne correspond ?",
+      "code": "<?php\n$stmt = $pdo->prepare('SELECT * FROM task WHERE id = :id');\n$stmt->execute(['id' => 999999]);\n$row = $stmt->fetch();",
+      "choices": ["null", "false", "Un tableau vide", "Une PDOException"],
+      "answer": 1,
+      "explanation": "fetch() renvoie false (pas null) quand il n'y a plus de ligne. Le repository doit donc convertir : `$row === false ? null : Task::fromRow($row)`."
+    },
+    {
+      "question": "Comment le repository sait-il qu'un DELETE a réellement supprimé une tâche (pour renvoyer 404 sinon) ?",
+      "choices": ["`$stmt->execute()` renvoie false si rien n'est supprimé", "`$stmt->rowCount() > 0`", "`$pdo->lastInsertId()`", "Il faut refaire un SELECT avant le DELETE, c'est la seule façon"],
+      "answer": 1,
+      "explanation": "execute() renvoie true même si aucune ligne n'est touchée. rowCount() donne le nombre de lignes affectées (≈ ExecuteNonQuery en ADO.NET)."
+    },
+    {
+      "question": "Avec le motif `/api/tasks/{id}` transformé en `#^/api/tasks/(?<id>\\d+)$#`, que contient `$matches` après `preg_match($regex, '/api/tasks/42', $matches)` ?",
+      "choices": ["`['id' => 42]`", "`[0 => '/api/tasks/42', 'id' => '42', 1 => '42']`", "`['42']`", "`true`"],
+      "answer": 1,
+      "explanation": "preg_match remplit $matches avec la correspondance complète, le groupe nommé ET son index numérique. Les valeurs sont des chaînes. On ne garde que les clés string pour les passer en arguments nommés."
+    },
+    {
+      "question": "Le routeur appelle `($handler)($request, ...['id' => '42'])`. Que faut-il pour que `TaskController::show()` reçoive bien la valeur ?",
+      "choices": ["Que le paramètre soit déclaré `int $id`", "Que le paramètre s'appelle exactement `$id` : le spread d'un tableau à clés string passe des arguments nommés", "Que show() n'ait qu'un seul paramètre", "Rien, PHP passe les valeurs dans l'ordre"],
+      "answer": 1,
+      "explanation": "Les clés string deviennent des arguments nommés : le nom doit correspondre (sinon « Unknown named parameter »). Et la valeur est une string : avec strict_types, `int $id` lèverait une TypeError, d'où `string $id` puis un cast."
+    },
+    {
+      "question": "Dans le front controller, pourquoi capturer `\\Throwable` en dernier recours plutôt que `\\Exception` ?",
+      "choices": ["\\Exception est dépréciée en PHP 8", "Pour attraper aussi les Error (TypeError, ValueError...) qui n'héritent pas d'Exception, et renvoyer une 500 JSON journalisée", "Parce que \\Throwable est plus rapide", "Pour pouvoir relancer l'exception"],
+      "answer": 1,
+      "explanation": "TypeError, ValueError, UnhandledMatchError héritent de Error, pas d'Exception. Sans catch(\\Throwable), un bug donnerait une page d'erreur HTML au lieu d'une réponse JSON 500 au format du contrat."
+    },
+    {
+      "question": "Quels flags de `json_encode` utilise l'API pour produire `{\"title\":\"Été/hiver\"}` plutôt que `{\"title\":\"\\u00c9t\\u00e9\\/hiver\"}` ? (plusieurs réponses)",
+      "choices": ["JSON_UNESCAPED_UNICODE", "JSON_UNESCAPED_SLASHES", "JSON_PRETTY_PRINT", "JSON_FORCE_OBJECT"],
+      "answer": [0, 1],
+      "explanation": "Par défaut, json_encode échappe les caractères non ASCII et les « / ». Les deux flags gardent le texte lisible. JSON_FORCE_OBJECT transformerait les listes en objets : à proscrire ici."
+    }
+  ],
+  "openQuestions": [
+    "Raconte le trajet complet d'une requête `POST /api/tasks` dans votre code, de `public/index.php` jusqu'à la réponse 201 : quelles classes, quelles méthodes, dans quel ordre ?",
+    "Que se passe-t-il exactement si le front envoie un JSON invalide ? Et un JSON valide mais avec un titre vide ? Montre les lignes de code concernées et le JSON renvoyé.",
+    "Pourquoi le lot B utilise-t-il des requêtes préparées partout ? Explique avec un exemple d'attaque ce qui se passerait sinon.",
+    "Comment ton code distingue-t-il une 404 d'une 405 ? Dans quel ordre le routeur teste-t-il les routes ?",
+    "Pourquoi les dates étaient-elles fausses (ou risquaient-elles de l'être) sans le `SET TIME ZONE` dans Connection ? D'où vient le format `2026-10-15T09:30:00+02:00` ?"
+  ]
+}

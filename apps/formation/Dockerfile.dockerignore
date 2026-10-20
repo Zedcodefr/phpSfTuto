@@ -1,0 +1,12 @@
+# Contexte = racine du dépôt. Les dépendances et fichiers générés ne sont pas envoyés au build.
+**/node_modules
+**/vendor
+**/var
+**/dist
+**/.phpunit.cache
+**/.DS_Store
+.git
+.idea
+.claude
+apps/formation/public/downloads
+apps/formation/protected

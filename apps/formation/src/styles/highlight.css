@@ -1,0 +1,98 @@
+/* Coloration syntaxique (classes highlight.js), accordée à la charte zedcode.fr.
+   Par défaut : thème sombre (vert profond). Thème clair : [data-theme='light'] ou « Auto » + système clair. */
+:root {
+  --hl-comment: #6f8f77;
+  --hl-keyword: #f0a830;
+  --hl-string: #9fd88a;
+  --hl-number: #f7c060;
+  --hl-title: #8cc8ff;
+  --hl-type: #f3b679;
+  --hl-variable: #c9d8cd;
+  --hl-meta: #b9a3ff;
+  --hl-deletion: #f28b82;
+  --hl-tag: #7fd1a8;
+}
+
+:root[data-theme='light'] {
+  --hl-comment: #6a7f6f;
+  --hl-keyword: #9a4f00;
+  --hl-string: #1d7a3a;
+  --hl-number: #8a5a00;
+  --hl-title: #0a5aa8;
+  --hl-type: #a3460a;
+  --hl-variable: #1f4d2a;
+  --hl-meta: #6a3fc0;
+  --hl-deletion: #b3261e;
+  --hl-tag: #116329;
+}
+
+@media (prefers-color-scheme: light) {
+  :root[data-theme='system'] {
+    --hl-comment: #6a7f6f;
+    --hl-keyword: #9a4f00;
+    --hl-string: #1d7a3a;
+    --hl-number: #8a5a00;
+    --hl-title: #0a5aa8;
+    --hl-type: #a3460a;
+    --hl-variable: #1f4d2a;
+    --hl-meta: #6a3fc0;
+    --hl-deletion: #b3261e;
+    --hl-tag: #116329;
+  }
+}
+
+.hljs-comment,
+.hljs-quote {
+  color: var(--hl-comment);
+  font-style: italic;
+}
+.hljs-keyword,
+.hljs-selector-tag,
+.hljs-built_in,
+.hljs-meta .hljs-keyword {
+  color: var(--hl-keyword);
+}
+.hljs-string,
+.hljs-regexp,
+.hljs-addition,
+.hljs-meta .hljs-string {
+  color: var(--hl-string);
+}
+.hljs-number,
+.hljs-literal,
+.hljs-symbol,
+.hljs-bullet {
+  color: var(--hl-number);
+}
+.hljs-title,
+.hljs-title.function_,
+.hljs-section {
+  color: var(--hl-title);
+}
+.hljs-title.class_,
+.hljs-type {
+  color: var(--hl-type);
+}
+.hljs-variable,
+.hljs-template-variable,
+.hljs-attr,
+.hljs-attribute,
+.hljs-property {
+  color: var(--hl-variable);
+}
+.hljs-meta {
+  color: var(--hl-meta);
+}
+.hljs-deletion {
+  color: var(--hl-deletion);
+}
+.hljs-tag,
+.hljs-name {
+  color: var(--hl-tag);
+}
+.hljs-emphasis {
+  font-style: italic;
+}
+.hljs-strong {
+  font-weight: 700;
+}

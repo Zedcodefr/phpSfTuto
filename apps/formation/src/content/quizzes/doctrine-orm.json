@@ -1,0 +1,91 @@
+{
+  "id": "doctrine-orm",
+  "title": "Doctrine : ORM, Unit of Work & mapping",
+  "questions": [
+    {
+      "question": "Combien de requêtes SQL ce code exécute-t-il, et que vaut le var_dump ?",
+      "code": "<?php\n$a = $em->find(Author::class, 1);\n$b = $em->find(Author::class, 1);\nvar_dump($a === $b);",
+      "choices": ["2 requêtes, false", "1 requête, true : l'Identity Map renvoie le même objet", "1 requête, false : deux objets identiques en valeur", "0 requête : find() lit le cache de résultats"],
+      "answer": 1,
+      "explanation": "Une ligne = un seul objet PHP par EntityManager. Le second find() par clé primaire ne touche pas la base. findOneBy() ou une requête DQL interrogeraient la base, mais réutiliseraient aussi l'objet existant."
+    },
+    {
+      "question": "Ce code ne produit aucune erreur, mais rien n'est enregistré en base. Pourquoi ?",
+      "code": "<?php\n$tag = new Tag('dystopie');\n$em->persist($tag);\n// fin de l'action du contrôleur, réponse 201",
+      "choices": ["Il faut appeler $tagRepository->save($tag)", "persist() ne fait que suivre l'objet : sans flush(), aucun SQL n'est exécuté", "Il faut d'abord appeler $em->beginTransaction()", "Doctrine attend la fin de la requête pour écrire"],
+      "answer": 1,
+      "explanation": "persist() ≈ DbSet.Add : aucun SQL. flush() ≈ SaveChanges : calcule les différences et exécute tout dans une transaction. Oublier flush() est silencieux."
+    },
+    {
+      "question": "Dans quels cas faut-il appeler `persist()` ? (plusieurs réponses)",
+      "choices": [
+        "Après avoir modifié une entité chargée avec find()",
+        "Pour une entité NEW qu'on veut insérer",
+        "Pour une entité NEW atteinte par une relation configurée avec cascade: ['persist'] depuis une entité déjà suivie : ce n'est PAS nécessaire",
+        "Avant chaque flush(), sur toutes les entités"
+      ],
+      "answer": [1, 2],
+      "explanation": "Une entité chargée est MANAGED : ses changements sont détectés au flush (change tracking implicite). persist() ne concerne que les nouveaux objets, sauf s'ils sont couverts par une cascade persist."
+    },
+    {
+      "question": "Dans un test, on modifie une entité, on fait flush(), puis on la relit avec findOneBy() pour vérifier. Pourquoi le test peut-il passer même si l'écriture en base était incomplète ?",
+      "choices": ["findOneBy() ne lit jamais la base", "L'Identity Map renvoie l'objet déjà en mémoire, avec ses valeurs modifiées : il faut $em->clear() avant de relire", "flush() est asynchrone", "Les tests utilisent une base en mémoire"],
+      "answer": 1,
+      "explanation": "C'est le rôle de forgetEverything() dans les tests du kata : vider l'Identity Map pour relire la vraie base."
+    },
+    {
+      "question": "Pourquoi le projet impose-t-il `\\DateTimeImmutable` (types `*_immutable`) plutôt que `\\DateTime` dans les entités ?",
+      "code": "<?php\n// avec un \\DateTime mutable\n$task->getDueAt()->modify('+1 day');\n$em->flush();",
+      "choices": ["DateTime n'est pas supporté par PostgreSQL", "Avec un DateTime mutable, modify() change l'objet sans que Doctrine voie de différence (même référence) : aucun UPDATE", "DateTimeImmutable est plus précis", "C'est seulement une convention de style"],
+      "answer": 1,
+      "explanation": "Doctrine compare les références d'objets pour les dates. Avec DateTimeImmutable, modify() renvoie un nouvel objet qu'il faut réaffecter : le changement est alors détecté."
+    },
+    {
+      "question": "Doctrine appelle-t-il le constructeur de l'entité quand il la charge depuis la base ?",
+      "choices": ["Oui, avec les valeurs des colonnes comme arguments", "Non : il crée l'objet par réflexion ; le constructeur ne sert qu'à votre code (création d'une entité NEW)", "Oui, sans argument", "Seulement si le constructeur est public"],
+      "answer": 1,
+      "explanation": "On peut donc imposer les champs obligatoires dans le constructeur sans gêner l'hydratation — c'est ce que font Task et les entités du kata."
+    },
+    {
+      "question": "Vous lancez `make sf-migration` sans avoir exécuté les migrations que vos collègues viennent de merger. Que contient la migration générée ?",
+      "choices": ["Seulement vos changements : Doctrine compare avec un snapshot", "Vos changements ET ceux des collègues : Doctrine compare le mapping à votre base locale, qui n'est pas à jour", "Rien : make:migration refuse de s'exécuter", "Une migration vide"],
+      "answer": 1,
+      "explanation": "Il n'y a pas de snapshot comme en EF Core. Toujours : rebase, make sf-migrate, puis make sf-migration — et relire le SQL généré."
+    },
+    {
+      "question": "Une migration déjà mergée contient une erreur. Que faire ?",
+      "choices": ["La corriger directement, tout le monde la rejouera", "Écrire une NOUVELLE migration qui corrige : les collègues ont déjà exécuté l'ancienne et ne la rejoueront pas", "Supprimer la table doctrine_migration_versions", "Faire make sf-db-reset sur le serveur de production"],
+      "answer": 1,
+      "explanation": "Une migration jouée est enregistrée dans doctrine_migration_versions : modifier son code n'a aucun effet chez ceux qui l'ont déjà exécutée."
+    },
+    {
+      "question": "Ticket B3 : renseigner `completedAt` quand une tâche passe au statut done. Quel mécanisme le cours recommande-t-il et pourquoi ?",
+      "choices": [
+        "Un lifecycle callback #[PreUpdate] dans l'entité, car c'est le seul possible",
+        "Un entity listener (#[AsEntityListener] sur preUpdate) : classe isolée, injection possible, et hasChangedField('status') indique ce qui a changé",
+        "Un UPDATE DQL après chaque flush",
+        "Un trigger SQL dans la migration"
+      ],
+      "answer": 1,
+      "explanation": "Le callback est plus simple mais sans injection ni information sur le champ modifié. Attention : les UPDATE DQL ne déclenchent aucun de ces événements."
+    },
+    {
+      "question": "La fixture des tâches a besoin d'un projet créé par ProjectFixtures. Comment l'obtient-elle ?",
+      "choices": [
+        "En appelant $projectRepository->find(1)",
+        "ProjectFixtures fait addReference('project-formation', $project) ; la fixture des tâches implémente DependentFixtureInterface et fait getReference(...)",
+        "En instanciant ProjectFixtures dans son load()",
+        "Les fixtures sont chargées par ordre alphabétique : il suffit de bien nommer les classes"
+      ],
+      "answer": 1,
+      "explanation": "getDependencies() garantit l'ordre de chargement, les références partagent les objets sans dépendre des ids."
+    }
+  ],
+  "openQuestions": [
+    "Dessine (ou décris) les 4 états d'une entité Doctrine et les appels qui font passer de l'un à l'autre. Où se situe chaque entité dans ton code de ticket ?",
+    "Explique pourquoi `TaskController::update()` n'appelle pas `persist()` alors que `create()` le fait.",
+    "Raconte ton workflow de migration pour ton ticket : commandes lancées, dans quel ordre, ce que tu as vérifié dans le fichier généré.",
+    "Comment tes fixtures dépendent-elles de celles des autres devs ? Montre l'ordre de chargement et les références.",
+    "Que se passe-t-il dans l'EntityManager si une contrainte d'unicité échoue au flush() ? Comment ton code évite-t-il ce cas ?"
+  ]
+}

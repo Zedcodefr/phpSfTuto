@@ -1,0 +1,133 @@
+{
+  "id": "php-principes",
+  "title": "Principes de PHP",
+  "questions": [
+    {
+      "question": "Avec PHP-FPM, que devient une variable statique de classe remplie pendant une requête HTTP lorsque la requête suivante arrive ?",
+      "choices": [
+        "Elle conserve sa valeur, comme un champ static en C# dans Kestrel",
+        "Elle est de nouveau vide : chaque requête repart de zéro (modèle « share nothing »)",
+        "Elle est partagée entre tous les workers FPM",
+        "Elle est sauvegardée automatiquement dans OPcache"
+      ],
+      "answer": 1,
+      "explanation": "Chaque requête exécute le script de zéro et tout est détruit à la fin. Aucun état applicatif ne survit en mémoire entre deux requêtes : il faut une base, un cache (Redis…) ou une session."
+    },
+    {
+      "question": "Quel est le rôle d'OPcache ?",
+      "choices": [
+        "Mettre en cache les réponses HTTP",
+        "Mettre en cache les résultats des requêtes SQL",
+        "Garder en mémoire les scripts déjà compilés en opcodes pour éviter de les recompiler à chaque requête",
+        "Compiler le PHP en binaire natif à l'installation"
+      ],
+      "answer": 2,
+      "explanation": "PHP compile chaque fichier en opcodes (l'équivalent de l'IL). OPcache conserve ces opcodes en mémoire partagée : le code n'est recompilé que s'il change. Ce sont les opcodes qui sont partagés, pas les données de vos objets."
+    },
+    {
+      "question": "Que provoque `declare(strict_types=1);` en tête de fichier ?",
+      "code": "<?php\ndeclare(strict_types=1);\n\nfunction double(int $n): int { return $n * 2; }\n\necho double(\"21\");",
+      "choices": [
+        "Affiche 42",
+        "Lève une TypeError car \"21\" est une chaîne",
+        "Affiche 2121",
+        "Erreur de syntaxe"
+      ],
+      "answer": 1,
+      "explanation": "Sans strict_types, PHP convertirait silencieusement \"21\" en 21. Avec strict_types=1, les types scalaires des appels faits depuis ce fichier sont vérifiés strictement : TypeError."
+    },
+    {
+      "question": "Quelles affirmations sur Composer sont vraies ? (plusieurs réponses)",
+      "choices": [
+        "composer.json joue le rôle du .csproj (dépendances déclarées)",
+        "composer.lock fige les versions exactes installées et doit être versionné pour une application",
+        "Le dossier vendor/ doit être versionné dans Git",
+        "Composer génère un autoloader qui charge les classes selon la règle PSR-4 namespace → dossier"
+      ],
+      "answer": [
+        0,
+        1,
+        3
+      ],
+      "explanation": "vendor/ est regénéré par `composer install` à partir du composer.lock : on ne le versionne pas, comme bin/ et obj/ en .NET."
+    },
+    {
+      "question": "Avec l'autoload PSR-4 `\"App\\\\\": \"src/\"`, où doit se trouver la classe `App\\Repository\\TaskRepository` ?",
+      "choices": [
+        "src/TaskRepository.php",
+        "src/Repository/TaskRepository.php",
+        "src/App/Repository/TaskRepository.php",
+        "N'importe où dans src/, Composer scanne tous les fichiers"
+      ],
+      "answer": 1,
+      "explanation": "Le préfixe App\\ correspond à src/, chaque segment de namespace restant est un dossier, et le nom du fichier est exactement le nom de la classe (casse comprise)."
+    },
+    {
+      "question": "Un développeur ajoute un « compteur de requêtes » dans une propriété statique d'une classe et l'incrémente à chaque appel de l'API. Après 3 appels successifs, que lit-il au 3ᵉ appel ?",
+      "code": "<?php\ndeclare(strict_types=1);\n\nfinal class Stats\n{\n    public static int $hits = 0;\n}\n\nStats::$hits++;\necho Stats::$hits;",
+      "choices": [
+        "3",
+        "1",
+        "0",
+        "Cela dépend du nombre de workers PHP-FPM"
+      ],
+      "answer": 1,
+      "explanation": "Chaque requête réexécute le script depuis zéro : la propriété statique repart de 0 et vaut 1 après l'incrément. Pour compter réellement, il faut un stockage externe (base, Redis, APCu)."
+    },
+    {
+      "question": "Une méthode contient une faute de type dans une branche `if` qui n'est jamais exécutée par vos tests manuels. Qu'est-ce qui la détectera ?",
+      "choices": [
+        "`php -l` (make php-lint)",
+        "Le chargement du fichier par PHP au démarrage de la requête",
+        "Un analyseur statique comme PHPStan",
+        "OPcache, qui compile tout le fichier"
+      ],
+      "answer": 2,
+      "explanation": "Les erreurs de typage PHP sont détectées à l'exécution. `php -l` ne vérifie que la syntaxe et OPcache ne fait que mettre en cache les opcodes : seul un analyseur statique (PHPStan) repère le problème sans exécuter le code."
+    },
+    {
+      "question": "Le fichier `A.php` déclare `declare(strict_types=1);` et définit `function double(int $n)`. Le fichier `B.php`, SANS strict_types, appelle `double(\"21\")`. Que se passe-t-il ?",
+      "choices": [
+        "TypeError, car la fonction est déclarée dans un fichier strict",
+        "Retourne 42 : strict_types s'applique aux appels faits depuis le fichier qui le déclare, ici B.php",
+        "Erreur de compilation au chargement de B.php",
+        "Retourne \"2121\""
+      ],
+      "answer": 1,
+      "explanation": "strict_types est une directive par fichier qui s'applique aux appels émis depuis ce fichier. B.php n'étant pas strict, \"21\" est converti en 21. D'où la règle du projet : strict_types dans TOUS les fichiers."
+    },
+    {
+      "question": "Pour inspecter une variable pendant le développement de l'API JSON, quelle méthode ne casse pas la réponse envoyée au front ?",
+      "choices": [
+        "`var_dump($data);`",
+        "`echo print_r($data, true);`",
+        "`error_log(print_r($data, true));` puis `make logs s=api-php`",
+        "`dd($data);`"
+      ],
+      "answer": 2,
+      "explanation": "Tout ce qui est affiché part dans le corps HTTP et casse le JSON (et peut provoquer « headers already sent »). error_log écrit dans les logs du conteneur. Le débogueur Xdebug est l'autre bonne option."
+    },
+    {
+      "question": "Quelles affirmations sont vraies dans le modèle PHP-FPM ? (plusieurs réponses)",
+      "choices": [
+        "Une exception non capturée ne fait échouer que la requête en cours",
+        "Il faut protéger les variables statiques avec des verrous car plusieurs requêtes y accèdent en même temps",
+        "Une fuite mémoire est peu grave car tout est libéré en fin de requête",
+        "Il n'y a pas d'async/await : on augmente la capacité en ajoutant des workers"
+      ],
+      "answer": [
+        0,
+        2,
+        3
+      ],
+      "explanation": "Les requêtes sont isolées : pas d'état partagé, donc pas de verrous dans le code (la concurrence est gérée par la base). Un worker traite une requête à la fois, de manière synchrone."
+    }
+  ],
+  "openQuestions": [
+    "Explique ce qui se passe, étape par étape, entre l'arrivée d'une requête HTTP sur le serveur et l'envoi de la réponse, dans notre stack nginx + PHP-FPM (et ce qui change avec `php -S` dans l'API PHP pur).",
+    "Pourquoi un singleton « cache en mémoire » écrit comme en C# ne sert à rien en PHP-FPM ? Que faudrait-il utiliser à la place ?",
+    "Quelle différence fais-tu entre `composer install` et `composer update` ? Lequel lances-tu après un git pull, et pourquoi committe-t-on composer.lock mais pas vendor/ ?",
+    "Tu crées la classe `App\\Validation\\TaskValidator` : où doit être le fichier et que se passe-t-il exactement quand index.php fait `new TaskValidator()` pour la première fois ?",
+    "Qu'apporte `declare(strict_types=1)` dans ton code ? Montre un endroit de ton lot où, sans lui, un bug passerait silencieusement."
+  ]
+}

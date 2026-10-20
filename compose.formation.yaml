@@ -1,0 +1,22 @@
+# Support de formation (app React hébergée) : utilisé uniquement par formation.mk
+# (docker compose -f compose.yaml -f compose.formation.yaml). Exclu du projet distribué aux participants.
+services:
+  # ---------------------------------------------------------------- Support de formation (app React hébergée)
+  # Démarré uniquement avec `make formation-dev` (profil "formation")
+  formation:
+    image: node:24-alpine
+    profiles: [formation]
+    user: "${HOST_UID:-1000}:${HOST_GID:-1000}"
+    working_dir: /repo/apps/formation
+    # Serveur d'auth Node (port 3001) en arrière-plan + Vite (port 5174) qui lui proxifie /api/formateur
+    command: sh -c "npm run package && (PORT=3001 node server/server.mjs &) && exec npx vite --host 0.0.0.0 --port 5174"
+    ports:
+      - "5174:5174"
+    environment:
+      HOME: /tmp
+      NPM_CONFIG_UPDATE_NOTIFIER: "false"
+      FORMATEUR_PASSWORD: formateur                                # dev uniquement
+      SESSION_SECRET: dev-secret-not-for-production-0123456789abcdef
+      COOKIE_SECURE: "false"
+    volumes:
+      - ./:/repo

@@ -1,0 +1,154 @@
+{
+  "id": "vue-php-http",
+  "title": "PHP & HTTP",
+  "questions": [
+    {
+      "question": "Le front Vue envoie `POST /api/tasks` avec `fetch(..., { body: JSON.stringify({ title: 'Apprendre PHP' }) })` et l'en-tête `Content-Type: application/json`. Que contient `$_POST` ?",
+      "choices": [
+        "`['title' => 'Apprendre PHP']`",
+        "La chaîne `'{\"title\":\"Apprendre PHP\"}'`",
+        "Un tableau vide",
+        "`null`"
+      ],
+      "answer": 2,
+      "explanation": "`$_POST` n'est rempli que pour les formulaires HTML (`x-www-form-urlencoded`, `multipart/form-data`). Pour du JSON, il n'y a pas de body-parser intégré : on lit le flux brut avec `file_get_contents('php://input')`, puis `json_decode()`."
+    },
+    {
+      "question": "Quel code est l'équivalent de `req.body` d'Express (avec `express.json()`) pour une requête JSON ?",
+      "choices": [
+        "`$data = json_decode(file_get_contents('php://input'), true, flags: JSON_THROW_ON_ERROR);`",
+        "`$data = $_POST;`",
+        "`$data = $_REQUEST['body'];`",
+        "`$data = JSON.parse($_SERVER['BODY']);`"
+      ],
+      "answer": 0,
+      "explanation": "Le corps brut se lit dans `php://input`. `true` demande un tableau associatif (plutôt qu'un objet stdClass), et `JSON_THROW_ON_ERROR` lève une `\\JsonException` si le JSON est invalide : à vous de la transformer en 400."
+    },
+    {
+      "question": "En JS, `JSON.parse('pas du json')` lève une SyntaxError. Que vaut `$data` ici ?",
+      "code": "<?php\n$data = json_decode('pas du json', true);",
+      "choices": [
+        "Une `\\JsonException` est levée",
+        "`false`",
+        "La chaîne `'pas du json'`",
+        "`null`, sans aucune erreur"
+      ],
+      "answer": 3,
+      "explanation": "Sans flag, `json_decode` renvoie `null` en silence : impossible de distinguer un JSON invalide d'un `null` JSON valide. D'où le flag `JSON_THROW_ON_ERROR`, systématique dans le projet."
+    },
+    {
+      "question": "Quelles situations provoquent un warning « Cannot modify header information - headers already sent » ? (plusieurs réponses)",
+      "choices": [
+        "Un `var_dump()` de débogage placé avant un appel à `header()`",
+        "Une ligne vide avant `<?php` dans un fichier chargé par l'autoloader",
+        "L'absence de balise fermante `?>` à la fin d'un fichier de classe",
+        "Un avertissement PHP affiché à l'écran avant les en-têtes"
+      ],
+      "answer": [
+        0,
+        1,
+        3
+      ],
+      "explanation": "Dès que le premier octet du corps part, les en-têtes partent avec : c'est l'équivalent de « Cannot set headers after they are sent to the client » en Express. Ne pas fermer `?>` est justement la règle qui évite d'envoyer une ligne vide par accident."
+    },
+    {
+      "question": "Quel code PHP est l'équivalent de `res.status(201).set('Location', '/api/tasks/3').json(task)` ?",
+      "choices": [
+        "`echo json_encode($task); http_response_code(201); header('Location: /api/tasks/3');`",
+        "`http_response_code(201); header('Content-Type: application/json; charset=utf-8'); header('Location: /api/tasks/3'); echo json_encode($task);`",
+        "`return ['status' => 201, 'Location' => '/api/tasks/3', 'body' => $task];`",
+        "`header('Location: /api/tasks/3'); echo json_encode($task); http_response_code(201);`"
+      ],
+      "answer": 1,
+      "explanation": "Code et en-têtes d'abord, puis un seul `echo` à la fin. Une fois le corps commencé, il est trop tard pour changer le code ou ajouter un en-tête. `res.json()` ajoute le Content-Type ; en PHP, c'est à vous de le faire (c'est le rôle de `JsonResponse::send()`)."
+    },
+    {
+      "question": "Le contrat attend `{\"title\":\"Été / hiver\"}`. Par défaut, `json_encode` produit `{\"title\":\"\\u00c9t\\u00e9 \\/ hiver\"}`. Quels flags faut-il ajouter ? (plusieurs réponses)",
+      "choices": [
+        "`JSON_UNESCAPED_UNICODE`",
+        "`JSON_PRETTY_PRINT`",
+        "`JSON_UNESCAPED_SLASHES`",
+        "`JSON_FORCE_OBJECT`"
+      ],
+      "answer": [
+        0,
+        2
+      ],
+      "explanation": "Par défaut, `json_encode` échappe les caractères non ASCII et les `/`. Le projet combine `JSON_THROW_ON_ERROR | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES`. `JSON_FORCE_OBJECT` transformerait les listes en objets : à éviter."
+    },
+    {
+      "question": "Quelle est la seule écriture sûre pour filtrer les tâches sur `?status=` ?",
+      "choices": [
+        "`$pdo->query(\"SELECT * FROM task WHERE status = '$status'\");`",
+        "`$pdo->query('SELECT * FROM task WHERE status = \\'' . addslashes($status) . '\\'');`",
+        "`$stmt = $pdo->prepare('SELECT * FROM task WHERE status = :status'); $stmt->execute(['status' => $status]);`",
+        "`$pdo->query(sprintf(\"SELECT * FROM task WHERE status = '%s'\", $status));`"
+      ],
+      "answer": 2,
+      "explanation": "Avec une requête préparée, le SQL et les valeurs voyagent séparément jusqu'à la base : une valeur ne peut jamais devenir du SQL. Concaténer ou interpoler, c'est le même problème qu'une requête `pg` construite par template literal (`x' OR '1'='1`)."
+    },
+    {
+      "question": "Avec `pg`, une requête sans résultat donne `rows[0] === undefined`. Que renvoie `$stmt->fetch()` quand aucune ligne ne correspond ?",
+      "choices": [
+        "`null`",
+        "`false`",
+        "un tableau vide",
+        "une exception `PDOException`"
+      ],
+      "answer": 1,
+      "explanation": "`fetch()` renvoie `false` s'il n'y a pas de ligne. Le repository doit le tester (`if ($row === false) return null;`) pour que `find()` renvoie `?Task` et que le contrôleur réponde 404."
+    },
+    {
+      "question": "Une ligne lue par PDO contient `'id' => '7'`. Que se passe-t-il avec ce code, sous `strict_types=1` ?",
+      "code": "<?php\ndeclare(strict_types=1);\n\n// Task::__construct(string $title, ..., ?int $id = null)\n$task = new Task(title: $row['title'], id: $row['id']);",
+      "choices": [
+        "Ça fonctionne : PHP convertit '7' en 7",
+        "L'id vaut null",
+        "Erreur SQL au moment du fetch",
+        "TypeError : il faut convertir explicitement avec `(int) $row['id']`"
+      ],
+      "answer": 3,
+      "explanation": "PDO renvoie souvent des chaînes, même pour une colonne entière. Avec `strict_types`, aucune conversion implicite : on convertit explicitement avant de passer la valeur à un paramètre typé."
+    },
+    {
+      "question": "Express transforme `/api/tasks/:id` en regex. Avec le motif `#^/api/tasks/(?<id>\\d+)$#`, que contient `$matches` ?",
+      "code": "<?php\npreg_match('#^/api/tasks/(?<id>\\d+)$#', '/api/tasks/42', $matches);",
+      "choices": [
+        "`['id' => '42']`",
+        "`[0 => '/api/tasks/42', 'id' => '42', 1 => '42']`",
+        "`[0 => '/api/tasks/42', 1 => '42']`",
+        "`['id' => 42]`"
+      ],
+      "answer": 1,
+      "explanation": "`preg_match` remplit la correspondance complète (clé 0), puis chaque groupe à la fois par son numéro et par son nom. Les valeurs sont des chaînes. C'est pourquoi le routeur filtre les clés string pour obtenir l'équivalent de `req.params`."
+    },
+    {
+      "question": "La requête `DELETE /api/tasks/42` arrive. Le chemin correspond à une route GET et à une route PATCH, mais aucune route DELETE n'existe. Que doit répondre le routeur ?",
+      "choices": [
+        "404 Not Found",
+        "400 Bad Request",
+        "405 Method Not Allowed",
+        "500 Internal Server Error"
+      ],
+      "answer": 2,
+      "explanation": "Le chemin existe, c'est la méthode qui n'est pas acceptée : 405. Le 404 est réservé au cas où aucun chemin ne correspond. Le routeur doit donc retenir qu'un chemin a correspondu avant de conclure."
+    },
+    {
+      "question": "Dans le front controller, pourquoi le dernier `catch` attrape-t-il `\\Throwable` plutôt que `\\Exception` ?",
+      "choices": [
+        "`\\Exception` n'attrape pas les `\\Error` (TypeError, appel d'une méthode inexistante…), qui donneraient une page d'erreur au lieu d'un JSON 500",
+        "`\\Throwable` est plus rapide à attraper",
+        "`\\Exception` n'existe plus en PHP 8",
+        "C'est indifférent, c'est une convention"
+      ],
+      "answer": 0,
+      "explanation": "`\\Throwable` est la racine de `\\Exception` et de `\\Error`. Comme le middleware d'erreur à quatre arguments d'Express, ce dernier `catch` garantit une réponse JSON 500 pour tout bug. Il vient en dernier, car le premier `catch` qui correspond gagne."
+    }
+  ],
+  "openQuestions": [
+    "Raconte le trajet d'une requête `POST /api/tasks` dans ton API PHP pur, de `public/index.php` jusqu'à la réponse 201, en le comparant à une app Express (`express.json()`, `app.post(...)`, `res.status(201).json(...)`) : quelles classes, quelles méthodes, dans quel ordre ?",
+    "Que se passe-t-il exactement si le front Vue envoie un JSON invalide ? Et un JSON valide mais avec un titre vide ? Montre les lignes de code concernées et le JSON renvoyé.",
+    "Pourquoi le lot B utilise-t-il des requêtes préparées partout ? Explique avec un exemple d'attaque ce qui se passerait sinon.",
+    "Comment ton routeur transforme-t-il `/api/tasks/{id}` en paramètres (l'équivalent de `req.params`), et comment distingue-t-il une 404 d'une 405 ?"
+  ]
+}

@@ -1,0 +1,148 @@
+{
+  "id": "vue-back-sql",
+  "title": "SQL et bases relationnelles",
+  "questions": [
+    {
+      "question": "Côté front, un livre contient un objet imbriqué `author: { name, country }`. Comment est-il représenté en base relationnelle ?",
+      "choices": [
+        "Par une colonne `author` de type texte contenant le JSON",
+        "Par deux colonnes `author_name` et `author_country` dans la table des livres",
+        "Par une autre table `kata_author`, reliée au livre par une clé étrangère `author_id`",
+        "Par une table de jointure `kata_book_author`, obligatoire pour tout objet imbriqué"
+      ],
+      "answer": 2,
+      "explanation": "Un objet imbriqué devient une autre table, reliée par une clé étrangère. La table de jointure sert aux relations N-N (un tableau imbriqué comme `tags: [...]`)."
+    },
+    {
+      "question": "Un auteur a plusieurs livres (relation 1-N). Où se trouve la clé qui les relie ?",
+      "choices": [
+        "Dans `kata_author`, une colonne `book_ids` contenant la liste des livres",
+        "Côté « plusieurs » : la colonne `kata_book.author_id`",
+        "Dans une table de jointure `kata_author_book`",
+        "Des deux côtés, pour pouvoir naviguer dans les deux sens"
+      ],
+      "answer": 1,
+      "explanation": "En 1-N, la clé étrangère est du côté « plusieurs » : chaque livre pointe vers son auteur. La table de jointure est réservée au N-N (`kata_book_tag(book_id, tag_id)`)."
+    },
+    {
+      "question": "Lesquels de ces mécanismes empêchent une donnée incohérente d'entrer en base, même si le code PHP a un bug ? (plusieurs réponses)",
+      "choices": [
+        "Une contrainte `NOT NULL` sur `title`",
+        "Le `required` du formulaire Vue",
+        "Une clé étrangère `author_id` vers `kata_author.id`",
+        "Un `CHECK (status IN ('todo','in_progress','done'))`",
+        "Le type TypeScript `status: 'todo' | 'in_progress' | 'done'`"
+      ],
+      "answer": [0, 2, 3],
+      "explanation": "Les contraintes de la base sont la dernière ligne de défense. Le `required` et les types TypeScript n'existent que côté front : ils ne protègent pas la donnée elle-même."
+    },
+    {
+      "question": "Pourquoi ne pas stocker les étiquettes d'un livre dans une colonne JSON `[\"classique\",\"aventure\"]` ?",
+      "choices": [
+        "PostgreSQL ne sait pas stocker de JSON",
+        "Parce que le JSON prend plus de place qu'une table",
+        "Parce que le front ne saurait pas relire ce JSON",
+        "Renommer une étiquette, chercher « tous les livres aventure » ou compter par étiquette deviendraient lents ou impossibles proprement"
+      ],
+      "answer": 3,
+      "explanation": "Normalisation : chaque information est stockée à un seul endroit et reliée par des clés. PostgreSQL sait stocker du JSON (utile pour des données vraiment libres), mais ce n'est pas le choix par défaut."
+    },
+    {
+      "question": "Quelle requête SQL fait la même chose que ce code JS, mais en base ?",
+      "code": "books\n  .filter(b => b.pages > 500)\n  .sort((a, b) => b.pages - a.pages)\n  .slice(0, 10)\n  .map(b => ({ title: b.title, pages: b.pages }))",
+      "language": "ts",
+      "choices": [
+        "`SELECT title, pages FROM kata_book WHERE pages > 500 ORDER BY pages DESC LIMIT 10;`",
+        "`SELECT title, pages FROM kata_book HAVING pages > 500 ORDER BY pages LIMIT 10;`",
+        "`SELECT * FROM kata_book ORDER BY pages DESC LIMIT 10 WHERE pages > 500;`",
+        "`SELECT title, pages FROM kata_book WHERE pages > 500 LIMIT 10 OFFSET 500;`"
+      ],
+      "answer": 0,
+      "explanation": "`WHERE` ≈ filter, `ORDER BY ... DESC` ≈ sort décroissant, `LIMIT` ≈ slice, les colonnes du SELECT ≈ map. Et on le fait en base, pas en chargeant toute la table en mémoire : la base a des index et ne transfère que le résultat."
+    },
+    {
+      "question": "Que fait cette requête ?",
+      "code": "UPDATE task SET status = 'done';",
+      "language": "sql",
+      "choices": [
+        "Elle échoue : un UPDATE exige une clause WHERE",
+        "Elle met à jour la dernière tâche insérée",
+        "Elle demande une confirmation dans psql",
+        "Elle passe TOUTES les tâches en `done`"
+      ],
+      "answer": 3,
+      "explanation": "Sans WHERE, UPDATE (comme DELETE) s'applique à toutes les lignes de la table. On écrit `UPDATE task SET status = 'done' WHERE id = 5;`."
+    },
+    {
+      "question": "On veut la liste de **tous** les auteurs, y compris ceux qui n'ont aucun livre. Quelle jointure utiliser ?",
+      "choices": [
+        "`INNER JOIN` (ou `JOIN`)",
+        "Aucune : il faut deux requêtes et fusionner en PHP",
+        "`LEFT JOIN` depuis `kata_author`",
+        "`JOIN ... WHERE b.id IS NOT NULL`"
+      ],
+      "answer": 2,
+      "explanation": "INNER JOIN ne garde que les correspondances : Margaret Atwood, sans livre, disparaîtrait. LEFT JOIN garde toutes les lignes de gauche, avec NULL quand il n'y a pas de correspondance."
+    },
+    {
+      "question": "Margaret Atwood n'a aucun livre. Combien de livres lui attribue cette requête ?",
+      "code": "SELECT a.name, COUNT(*) AS livres\nFROM kata_author a\nLEFT JOIN kata_book b ON b.author_id = a.id\nGROUP BY a.id, a.name;",
+      "language": "sql",
+      "choices": ["0", "1", "NULL", "La ligne d'Atwood n'apparaît pas"],
+      "answer": 1,
+      "explanation": "Le LEFT JOIN produit une ligne pour Atwood, remplie de NULL côté livre : `COUNT(*)` la compte. Il faut `COUNT(b.id)`, qui ignore les NULL, pour obtenir 0."
+    },
+    {
+      "question": "On veut uniquement les auteurs qui ont **au moins 2 livres**. Où placer la condition `COUNT(b.id) >= 2` ?",
+      "choices": [
+        "Dans le `WHERE`, avant le `GROUP BY`",
+        "Dans le `ORDER BY`",
+        "Dans la condition `ON` de la jointure",
+        "Dans un `HAVING`, après le `GROUP BY`"
+      ],
+      "answer": 3,
+      "explanation": "WHERE filtre les lignes avant le regroupement ; HAVING filtre les groupes après. Un agrégat comme COUNT n'existe qu'une fois les groupes formés."
+    },
+    {
+      "question": "Quelle requête renvoie la **page 3** des tâches triées par titre, avec 10 tâches par page ?",
+      "choices": [
+        "`SELECT * FROM task ORDER BY title LIMIT 10 OFFSET 20;`",
+        "`SELECT * FROM task LIMIT 10 OFFSET 20;`",
+        "`SELECT * FROM task ORDER BY title LIMIT 10 OFFSET 30;`",
+        "`SELECT * FROM task ORDER BY title LIMIT 30 OFFSET 20;`"
+      ],
+      "answer": 0,
+      "explanation": "`OFFSET = (page - 1) × taille de page` = 20. Sans ORDER BY, l'ordre n'est pas garanti : la pagination serait incohérente d'une page à l'autre."
+    },
+    {
+      "question": "Le serveur s'arrête juste après le premier `UPDATE`. Quel est l'état de la base au redémarrage ?",
+      "code": "BEGIN;\nUPDATE account SET balance = balance - 100 WHERE id = 1;\nUPDATE account SET balance = balance + 100 WHERE id = 2;\nCOMMIT;",
+      "language": "sql",
+      "choices": [
+        "Le compte 1 a perdu 100 €, le compte 2 n'a rien reçu",
+        "Aucun des deux comptes n'a changé : la transaction n'a pas été validée",
+        "Les deux comptes sont à jour : PostgreSQL termine la transaction au redémarrage",
+        "La base est corrompue et doit être restaurée"
+      ],
+      "answer": 1,
+      "explanation": "Atomicité : une transaction réussit entièrement ou pas du tout. Sans COMMIT, rien n'est appliqué. À l'inverse, un COMMIT confirmé survit à un crash (durabilité)."
+    },
+    {
+      "question": "Une migration déjà partagée avec l'équipe crée une colonne mal nommée. Que faire ?",
+      "choices": [
+        "Modifier la migration existante et prévenir l'équipe",
+        "Supprimer la migration et en régénérer une propre",
+        "Renommer la colonne directement dans Adminer",
+        "Ajouter une nouvelle migration qui renomme la colonne"
+      ],
+      "answer": 3,
+      "explanation": "Les migrations sont l'historique du schéma, comme des commits Git : on ne modifie jamais une migration déjà partagée, on en ajoute une nouvelle, rejouable dans l'ordre sur chaque base."
+    }
+  ],
+  "openQuestions": [
+    "Prends un objet JSON imbriqué de ton front (un livre avec son auteur et ses étiquettes) : comment le découpes-tu en tables ? Où sont les clés, et pourquoi ne pas tout mettre dans une colonne JSON ?",
+    "Explique la différence entre `INNER JOIN` et `LEFT JOIN` sur l'exercice « nombre de livres par auteur, y compris les auteurs sans livre ». Pourquoi `COUNT(b.id)` et pas `COUNT(*)` ?",
+    "Pourquoi filtrer, trier et paginer en SQL plutôt que de charger toute la table et faire un `.filter()` en PHP ? Qu'est-ce qu'un index, et pourquoi ne pas en mettre partout ?",
+    "Qu'est-ce qu'une transaction ? Donne un exemple dans TaskBoard où elle est indispensable, et explique ce que garantissent les lettres de ACID."
+  ]
+}

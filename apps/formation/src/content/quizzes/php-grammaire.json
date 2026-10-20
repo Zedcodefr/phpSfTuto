@@ -1,0 +1,96 @@
+{
+  "id": "php-grammaire",
+  "title": "La grammaire PHP",
+  "questions": [
+    {
+      "question": "Qu'affiche ce code ?",
+      "code": "<?php\n$a = ['x' => 1];\n$b = $a;\n$b['x'] = 2;\n\necho $a['x'];",
+      "choices": ["2", "1", "null", "Une erreur : $b est une référence en lecture seule"],
+      "answer": 1,
+      "explanation": "Un array PHP est copié à l'affectation (copy-on-write), contrairement à une List<T> C#. $a n'est pas modifié. Les objets, eux, sont partagés par référence."
+    },
+    {
+      "question": "Qu'affiche ce code ?",
+      "code": "<?php\nfunction addItem(array $items): void\n{\n    $items[] = 'x';\n}\n\n$list = [];\naddItem($list);\necho count($list);",
+      "choices": ["1", "0", "Une TypeError", "Un warning puis 1"],
+      "answer": 1,
+      "explanation": "Le tableau est passé par valeur : la fonction modifie une copie. Il faut renvoyer le nouveau tableau ($list = addItem($list)), passer un objet, ou (à éviter) une référence &$items."
+    },
+    {
+      "question": "Que renvoie `json_encode($even)` ?",
+      "code": "<?php\n$even = array_filter([1, 2, 3, 4], fn(int $n) => $n % 2 === 0);\necho json_encode($even);",
+      "choices": ["[2,4]", "{\"1\":2,\"3\":4}", "[null,2,null,4]", "{\"0\":2,\"1\":4}"],
+      "answer": 1,
+      "explanation": "array_filter conserve les clés d'origine (1 et 3) : ce n'est plus une liste, json_encode produit donc un objet JSON. Il faut array_values() pour réindexer — un bug classique dans une API."
+    },
+    {
+      "question": "Qu'affiche ce code ?",
+      "code": "<?php\n$arr = [1, 2, 3];\nforeach ($arr as &$v) {}\nforeach ($arr as $v) {}\n\necho implode(',', $arr);",
+      "choices": ["1,2,3", "1,2,2", "3,3,3", "1,1,1"],
+      "answer": 1,
+      "explanation": "Après la première boucle, $v reste une référence vers le dernier élément. La seconde boucle écrit chaque valeur dans ce dernier élément. D'où la règle : unset($v) après un foreach par référence, ou mieux, éviter les références."
+    },
+    {
+      "question": "Qu'affiche ce code ?",
+      "code": "<?php\n$x = 1;\n$f = fn() => $x;\n$x = 2;\n\necho $f();",
+      "choices": ["2, comme en C#", "1", "Une erreur : $x n'est pas capturée sans use", "null"],
+      "answer": 1,
+      "explanation": "Une arrow function capture automatiquement les variables, mais PAR VALEUR au moment de sa création. En C#, la lambda capture la variable elle-même et afficherait 2."
+    },
+    {
+      "question": "Lesquelles de ces comparaisons valent `true` en PHP 8 ? (plusieurs réponses)",
+      "choices": ["`null == false`", "`\"1\" == \"01\"`", "`\"abc\" == 0`", "`1 === 1.0`"],
+      "answer": [0, 1],
+      "explanation": "`==` compare après conversion : null == false et deux chaînes numériques comparées comme des nombres. Depuis PHP 8, \"abc\" == 0 est false. `===` compare aussi le type : int ≠ float. Règle du projet : toujours === et !==."
+    },
+    {
+      "question": "Ce code cherche si le titre commence par « A ». Quel est le bug ?",
+      "code": "<?php\n$title = 'Apprendre PHP';\nif (strpos($title, 'A')) {\n    echo 'trouvé';\n} else {\n    echo 'absent';\n}",
+      "choices": ["Aucun, il affiche « trouvé »", "Il affiche « absent » : strpos renvoie 0, qui est falsy", "strpos lève une exception si la lettre est en position 0", "strpos renvoie -1 si absent, il faut tester >= 0"],
+      "answer": 1,
+      "explanation": "strpos renvoie la position (0 ici) ou false si absent. 0 est falsy, donc la condition échoue. Utiliser str_starts_with() / str_contains(), ou comparer strictement à false."
+    },
+    {
+      "question": "Que donne ce `match` ?",
+      "code": "<?php\n$status = '1';\n\necho match ($status) {\n    1 => 'un',\n    default => 'autre',\n};",
+      "choices": ["un", "autre", "UnhandledMatchError", "Une TypeError"],
+      "answer": 1,
+      "explanation": "match compare avec === : la chaîne '1' n'est pas l'entier 1, on tombe dans default. Sans branche default, ce serait une UnhandledMatchError. Le vieux switch, lui, compare avec ==."
+    },
+    {
+      "question": "Dans `src/Controller/TaskController.php` (namespace `App\\Controller`), cette ligne lève une erreur. Pourquoi ?",
+      "code": "<?php\nnamespace App\\Controller;\n\n$now = new DateTimeImmutable();",
+      "choices": ["DateTimeImmutable nécessite `composer require`", "PHP cherche la classe App\\Controller\\DateTimeImmutable : il faut `\\DateTimeImmutable` ou un `use`", "Il faut passer une date au constructeur", "Les classes natives sont interdites dans un contrôleur"],
+      "answer": 1,
+      "explanation": "Dans un namespace, un nom de classe non qualifié est relatif au namespace courant. Les classes natives sont dans le namespace global : \\DateTimeImmutable. Les fonctions natives (strlen, count), elles, retombent automatiquement sur le global."
+    },
+    {
+      "question": "Que vaut `$len` ?",
+      "code": "<?php\n$len = strlen('Été');",
+      "choices": ["3", "5", "6", "Cela dépend de la locale du serveur"],
+      "answer": 1,
+      "explanation": "Les chaînes PHP sont des octets : « É » et « é » font 2 octets chacun en UTF-8, soit 5. mb_strlen('Été') vaut 3. La validation « 3 à 255 caractères » doit utiliser mb_strlen."
+    },
+    {
+      "question": "Quelles affirmations sur les enums PHP sont vraies ? (plusieurs réponses)",
+      "code": "<?php\nenum TaskStatus: string\n{\n    case Todo = 'todo';\n    case Done = 'done';\n}",
+      "choices": ["`TaskStatus::from('nope')` renvoie null", "`TaskStatus::tryFrom('nope')` renvoie null", "`json_encode(TaskStatus::Done)` produit `\"done\"`", "`TaskStatus::Done->value` vaut `'done'` et `->name` vaut `'Done'`"],
+      "answer": [1, 2, 3],
+      "explanation": "from() lève une ValueError si la valeur est inconnue, tryFrom() renvoie null (≈ Enum.TryParse). Un enum « backed » est sérialisé en JSON par sa valeur."
+    },
+    {
+      "question": "Pourquoi utiliser `DateTimeImmutable` plutôt que `DateTime` ?",
+      "code": "<?php\n$start = new \\DateTime('2026-01-01');\n$end = $start;\n$end->modify('+1 day');\necho $start->format('Y-m-d');",
+      "choices": ["Ce code affiche 2026-01-01 : il n'y a aucune différence", "Ce code affiche 2026-01-02 : DateTime est mutable et l'objet est partagé", "DateTime ne gère pas les fuseaux horaires", "DateTimeImmutable est plus rapide"],
+      "answer": 1,
+      "explanation": "Les objets sont manipulés par référence et DateTime::modify() modifie l'objet lui-même : $start change aussi. DateTimeImmutable::modify() renvoie une nouvelle instance."
+    }
+  ],
+  "openQuestions": [
+    "Explique la différence de comportement entre un array PHP et un objet quand on les affecte à une autre variable ou qu'on les passe à une fonction. Où cela a-t-il compté dans ton code ?",
+    "Dans ton code, montre une closure ou une arrow function (`fn`) et explique ce qu'elle capture, et comment. En quoi est-ce différent d'une lambda C# ?",
+    "Pourquoi le projet impose-t-il `===` partout ? Donne deux exemples où `==` donnerait un résultat surprenant.",
+    "Explique la ligne `$params = array_filter($matches, is_string(...), ARRAY_FILTER_USE_KEY);` (ou son équivalent dans ton code) : que contient `$matches`, que fait chaque argument ?",
+    "Explique `public readonly` et la constructor promotion sur la classe Task ou JsonResponse : qu'est-ce que PHP génère pour toi, et qu'est-ce qui est interdit ensuite ?"
+  ]
+}

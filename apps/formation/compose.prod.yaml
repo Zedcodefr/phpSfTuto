@@ -1,0 +1,18 @@
+# Exemple de déploiement sur votre serveur :
+#   docker build -f apps/formation/Dockerfile -t taskboard-formation .     (depuis la racine du dépôt)
+#   docker compose -f apps/formation/compose.prod.yaml --env-file apps/formation/.env.prod up -d
+#
+# .env.prod (à créer, NE PAS versionner) :
+#   FORMATEUR_PASSWORD_HASH=scrypt$...      (docker run --rm taskboard-formation node server/hash-password.mjs 'mot de passe')
+#   SESSION_SECRET=...                      (openssl rand -base64 48)
+services:
+  formation:
+    image: taskboard-formation
+    restart: unless-stopped
+    environment:
+      FORMATEUR_PASSWORD_HASH: ${FORMATEUR_PASSWORD_HASH:?FORMATEUR_PASSWORD_HASH manquant}
+      SESSION_SECRET: ${SESSION_SECRET:?SESSION_SECRET manquant}
+      COOKIE_SECURE: "true"   # le site doit être servi en HTTPS (reverse proxy)
+      TRUST_PROXY: "true"     # IP réelle lue dans X-Forwarded-For (le conteneur n'est joignable que via le proxy)
+    ports:
+      - "127.0.0.1:3000:3000" # exposé uniquement en local : le reverse proxy HTTPS fait la façade

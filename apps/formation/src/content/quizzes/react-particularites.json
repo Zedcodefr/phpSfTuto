@@ -1,0 +1,97 @@
+{
+  "id": "react-particularites",
+  "title": "React : particularités & pièges",
+  "questions": [
+    {
+      "question": "Quel est le problème de ce composant ?",
+      "code": "export function TaskPage({ error }: { error: string | null }) {\n  if (error) {\n    return <p>{error}</p>\n  }\n  const [filter, setFilter] = useState('all')\n  // ...\n}",
+      "language": "tsx",
+      "choices": ["Aucun", "Un hook est appelé après un return conditionnel : l'ordre des hooks change selon `error`, ce qui viole les règles des hooks", "useState doit être importé depuis 'react-dom'", "Il manque une key"],
+      "answer": 1,
+      "explanation": "React identifie les hooks par leur ordre d'appel. Tous les hooks d'abord, les return conditionnels ensuite. `make front-lint` détecte cette erreur (react/rules-of-hooks)."
+    },
+    {
+      "question": "Combien vaut `count` après un clic (en partant de 0) ?",
+      "code": "function handleClick() {\n  setCount(count + 1)\n  setCount(count + 1)\n}",
+      "language": "tsx",
+      "choices": ["2", "1", "0", "Cela dépend de StrictMode"],
+      "answer": 1,
+      "explanation": "Les deux appels calculent « ancienne valeur + 1 » avec la même valeur capturée (0). Avec la forme fonctionnelle `setCount((c) => c + 1)` deux fois, on obtient 2."
+    },
+    {
+      "question": "Ce minuteur reste bloqué à 1. Pourquoi ?",
+      "code": "const [count, setCount] = useState(0)\n\nuseEffect(() => {\n  const id = setInterval(() => setCount(count + 1), 1000)\n  return () => clearInterval(id)\n}, [])",
+      "language": "tsx",
+      "choices": ["setInterval ne fonctionne pas dans un effet", "Closure périmée : la fonction capture `count` du premier rendu (0) et calcule toujours 0 + 1", "La fonction de nettoyage arrête le minuteur immédiatement", "Il faut un useRef pour setInterval"],
+      "answer": 1,
+      "explanation": "L'effet ne s'exécute qu'une fois et sa closure garde count = 0. Correction : `setCount((c) => c + 1)` (ou ajouter count aux dépendances)."
+    },
+    {
+      "question": "En développement, l'onglet Réseau montre deux `GET /api/tasks` au chargement. Que faut-il faire ?",
+      "choices": ["Retirer <StrictMode> de main.tsx", "Rien d'anormal : StrictMode monte, démonte et remonte les composants en dev ; on s'assure que l'effet est correctement nettoyé (AbortController)", "Ajouter un booléen global « déjà chargé »", "Passer le tableau de dépendances à [tasks]"],
+      "answer": 1,
+      "explanation": "StrictMode simule ce qui arrive quand un utilisateur navigue vite. En production, une seule exécution. On corrige l'effet (nettoyage), on ne masque pas le symptôme."
+    },
+    {
+      "question": "L'utilisateur passe vite de /tasks/1 à /tasks/2 et voit parfois s'afficher la tâche 1. Quelle est la correction ?",
+      "code": "useEffect(() => {\n  fetch(`/api/tasks/${taskId}`)\n    .then((r) => r.json() as Promise<Task>)\n    .then(setTask)\n}, [taskId])",
+      "language": "tsx",
+      "choices": ["Retirer taskId des dépendances", "Créer un AbortController, passer son signal à fetch et renvoyer `() => controller.abort()` comme fonction de nettoyage", "Ajouter un setTimeout", "Utiliser `await` dans un useEffect async"],
+      "answer": 1,
+      "explanation": "C'est une race condition : la réponse de la tâche 1 arrive après celle de la 2. Le nettoyage annule la requête obsolète (≈ CancellationToken)."
+    },
+    {
+      "question": "Lesquelles de ces mises à jour d'état sont correctes ? (plusieurs réponses)",
+      "choices": [
+        "`tasks.push(newTask); setTasks(tasks)`",
+        "`setTasks((prev) => [...prev, newTask])`",
+        "`setTasks((prev) => prev.map((t) => (t.id === updated.id ? updated : t)))`",
+        "`tasks.sort(byTitle); setTasks(tasks)`"
+      ],
+      "answer": [1, 2],
+      "explanation": "React compare les références : muter le tableau (push, sort en place) garde la même référence, donc pas de re-rendu fiable. On crée toujours une nouvelle copie (spread, map, filter, toSorted)."
+    },
+    {
+      "question": "Pourquoi `key={index}` pose-t-il problème dans une liste où l'on peut supprimer des tâches ?",
+      "choices": ["React interdit les nombres comme key", "Après suppression, les index se décalent : l'état interne d'un élément (saisie, case cochée) se retrouve sur la mauvaise ligne", "Cela provoque une boucle infinie", "Ce n'est un problème que pour les listes de plus de 100 éléments"],
+      "answer": 1,
+      "explanation": "La key doit être stable et unique : l'id venant de la base. Elle se met sur l'élément renvoyé par map."
+    },
+    {
+      "question": "Où doit-on écrire « quand l'utilisateur clique sur Enregistrer, faire un POST /api/tasks » ?",
+      "choices": ["Dans un useEffect qui surveille un état `submitted`", "Dans le gestionnaire `onSubmit` du formulaire (avec `e.preventDefault()`)", "Dans le corps du composant", "Dans un custom hook appelé dans une condition"],
+      "answer": 1,
+      "explanation": "Un effet synchronise le composant avec l'extérieur ; une action utilisateur se traite dans son gestionnaire d'événement. preventDefault évite le rechargement de page natif du formulaire HTML."
+    },
+    {
+      "question": "Le POST renvoie 422 avec `violations: [{ propertyPath: 'title', title: '...' }]`. Quelle approche le cours recommande-t-il ?",
+      "choices": ["Revalider toutes les règles métier côté front pour ne jamais recevoir de 422", "apiFetch lève une ApiError portant status et violations ; le formulaire les transforme en erreurs par champ", "Afficher le JSON brut dans une alerte", "Réessayer automatiquement la requête"],
+      "answer": 1,
+      "explanation": "La validation qui fait foi est celle du back. Le front centralise la gestion d'erreurs dans src/api/client.ts et affiche les violations à côté des champs."
+    },
+    {
+      "question": "Avec un token dans localStorage, quelles affirmations sont vraies ? (plusieurs réponses)",
+      "choices": [
+        "Sur un 401, on oublie le token (déconnexion) et, s'il s'agissait d'un GET, on le rejoue une fois sans token",
+        "Sur un 403, on déconnecte aussi l'utilisateur",
+        "Masquer le bouton « Supprimer » suffit à empêcher la suppression par un non-auteur",
+        "Au rechargement de la page, on relit le token dans localStorage et on recharge l'utilisateur via GET /api/me"
+      ],
+      "answer": [0, 3],
+      "explanation": "401 = token absent, invalide ou expiré : l'API Symfony le renvoie même sur un GET public si le token est invalide, d'où le rejeu sans token (jamais pour une écriture). 403 = authentifié mais pas autorisé : message, pas de déconnexion. Masquer un bouton est un confort d'UX, la sécurité est assurée par le back."
+    },
+    {
+      "question": "Deux pages ont besoin de l'utilisateur connecté et de `signOut()`. Quel outil le cours recommande-t-il ?",
+      "choices": ["Redux", "Un Context (AuthProvider + hook useAuth)", "Une variable globale exportée par un module", "Passer user de props en props partout"],
+      "answer": 1,
+      "explanation": "Le Context rend une valeur accessible à tout un sous-arbre (≈ CascadingValue Blazor / service injecté). Une variable de module ne déclencherait pas de re-rendu."
+    }
+  ],
+  "openQuestions": [
+    "Explique le tableau de dépendances de chacun de tes useEffect : pourquoi ces valeurs, et que se passerait-il si tu en retirais une ?",
+    "Montre comment ton code annule une requête obsolète. Décris la race condition que cela évite.",
+    "Explique ton custom hook (useTasks ou équivalent) : quel état contient-il, et que se passe-t-il si deux composants l'appellent ?",
+    "Comment ton formulaire affiche-t-il les erreurs 422 par champ ? Suis le chemin de la réponse HTTP jusqu'au message affiché.",
+    "Où le token est-il ajouté aux requêtes, et comment l'application réagit-elle à un 401 puis à un 403 ?"
+  ]
+}

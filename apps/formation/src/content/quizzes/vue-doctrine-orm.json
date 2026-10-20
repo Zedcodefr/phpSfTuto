@@ -1,0 +1,146 @@
+{
+  "id": "vue-doctrine-orm",
+  "title": "Doctrine : ORM, Unit of Work & mapping",
+  "questions": [
+    {
+      "question": "On compare souvent l'EntityManager à un store Pinia. Quelles affirmations sont vraies ? (plusieurs réponses)",
+      "choices": [
+        "Il est réactif : modifier une entité met aussitôt la base à jour",
+        "Il naît et meurt avec chaque requête HTTP (modèle share nothing)",
+        "Il est partagé entre tous les utilisateurs connectés, comme un store global",
+        "La source de vérité reste la base : l'EntityManager n'est qu'un brouillon de travail"
+      ],
+      "answer": [
+        1,
+        3
+      ],
+      "explanation": "La ressemblance s'arrête au fait de garder des entités en mémoire. Rien n'est écrit avant flush(), rien ne survit à la requête, et deux requêtes (donc deux utilisateurs) n'ont jamais le même EntityManager."
+    },
+    {
+      "question": "Ce code ne produit aucune erreur, mais rien n'est enregistré en base. Pourquoi ?",
+      "code": "<?php\n$tag = new Tag('dystopie');\n$em->persist($tag);\nreturn $this->json($tag, 201);",
+      "choices": [
+        "Il faut appeler $tag->save(), comme avec Sequelize",
+        "Il faut d'abord ouvrir une transaction avec $em->beginTransaction()",
+        "persist() ne fait que suivre l'objet : sans flush(), aucun SQL n'est exécuté",
+        "Doctrine écrit en base à la fin de la requête HTTP, il suffit d'attendre"
+      ],
+      "answer": 2,
+      "explanation": "Contrairement à prisma.tag.create() qui écrit tout de suite, persist() ne fait que dire « suis cet objet ». C'est flush() qui calcule les différences et exécute le SQL dans une transaction. Oublier flush() est silencieux."
+    },
+    {
+      "question": "Combien de requêtes SQL ce code exécute-t-il, et que vaut le var_dump ?",
+      "code": "<?php\n$a = $em->find(Author::class, 1);\n$b = $em->find(Author::class, 1);\nvar_dump($a === $b);",
+      "choices": [
+        "1 requête, true : l'Identity Map renvoie le même objet",
+        "2 requêtes, false : deux objets distincts",
+        "1 requête, false : deux objets égaux en valeur",
+        "0 requête : find() lit un cache HTTP"
+      ],
+      "answer": 0,
+      "explanation": "Une ligne = un seul objet PHP par EntityManager, comme un store normalisé par id (entities[id]). Le second find() par clé primaire ne touche pas la base ; findOneBy() ou une requête DQL interrogeraient la base mais réutiliseraient l'objet existant."
+    },
+    {
+      "question": "Dans quels cas faut-il appeler `persist()` ? (plusieurs réponses)",
+      "choices": [
+        "Pour un objet NEW (créé avec new) qu'on veut insérer",
+        "Après avoir modifié une entité chargée avec find()",
+        "Avant chaque flush(), sur toutes les entités modifiées",
+        "Pour une nouvelle Review ajoutée à un livre suivi, seulement si Book::$reviews n'a PAS cascade: ['persist']"
+      ],
+      "answer": [
+        0,
+        3
+      ],
+      "explanation": "Une entité chargée est MANAGED : ses changements sont détectés au flush() par comparaison avec un snapshot. persist() ne concerne que les objets NEW, sauf s'ils sont atteints par une relation en cascade persist."
+    },
+    {
+      "question": "Doctrine suit le pattern Data Mapper. Qu'est-ce que cela implique pour une entité ?",
+      "choices": [
+        "Elle hérite d'une classe de base qui fournit save() et delete()",
+        "Elle ne peut pas être instanciée dans un test sans base de données",
+        "Elle est générée à partir d'un fichier de schéma, comme le client Prisma",
+        "C'est un objet PHP ordinaire, sans connaissance de la base : c'est l'EntityManager qui la sauvegarde"
+      ],
+      "answer": 3,
+      "explanation": "En Active Record (Sequelize, Eloquent, TypeORM avec BaseEntity), l'entité sait se sauvegarder. En Data Mapper, le mapping est décrit à part (attributs) et la persistance est l'affaire de l'EntityManager : on peut faire new Book(...) dans un test sans base."
+    },
+    {
+      "question": "Pourquoi ce code ne produit-il aucun UPDATE ?",
+      "code": "<?php\n// dueAt est un \\DateTime (mutable)\n$task->getDueAt()->modify('+1 day');\n$em->flush();",
+      "choices": [
+        "Parce que PostgreSQL ne stocke pas les heures",
+        "Parce que flush() ignore les colonnes de type date",
+        "Parce que modify() change l'objet en place : Doctrine compare les références, voit le même objet et ne détecte aucun changement",
+        "Parce qu'il manque un persist($task)"
+      ],
+      "answer": 2,
+      "explanation": "C'est le même piège qu'en Vue quand on mute un objet que la réactivité ne suit pas. Avec \\DateTimeImmutable (types *_IMMUTABLE), modify() renvoie un nouvel objet qu'il faut réaffecter : le changement est alors détecté."
+    },
+    {
+      "question": "Dans un test, on modifie une entité, on fait flush(), puis on la relit avec findOneBy() pour vérifier. Pourquoi ce test peut-il passer même si l'écriture en base était incomplète ?",
+      "choices": [
+        "L'Identity Map renvoie l'objet déjà en mémoire, avec ses valeurs modifiées : il faut $em->clear() avant de relire",
+        "findOneBy() ne lit jamais la base",
+        "flush() est asynchrone, comme une promesse non attendue",
+        "Les tests utilisent une base en mémoire"
+      ],
+      "answer": 0,
+      "explanation": "findOneBy() interroge bien la base, mais réutilise l'objet déjà connu. C'est le rôle de forgetEverything() dans les tests du kata : vider l'Identity Map pour relire la vraie base."
+    },
+    {
+      "question": "Ce code met à jour 200 tâches. Qu'est-ce qui ne va pas ?",
+      "code": "<?php\nforeach ($tasks as $task) {\n    $task->rename(trim($task->getTitle()));\n    $em->flush();\n}",
+      "choices": [
+        "Il manque un persist($task) avant chaque flush()",
+        "Un flush() par tour de boucle : chaque flush() parcourt toutes les entités suivies. On modifie tout, puis un seul flush() à la fin",
+        "rename() ne peut pas être appelé sur une entité chargée",
+        "Rien, c'est la façon recommandée"
+      ],
+      "answer": 1,
+      "explanation": "C'est l'équivalent d'un await api.save() dans un for côté front : ça marche, mais c'est le mauvais réflexe. Règle : un seul flush() à la fin de l'action du contrôleur ou du service."
+    },
+    {
+      "question": "Vous lancez `make sf-migration` sans avoir exécuté les migrations que vos collègues viennent de merger. Que contient la migration générée ?",
+      "choices": [
+        "Seulement vos changements : Doctrine compare avec un fichier de schéma, comme schema.prisma",
+        "Rien : make:migration refuse de s'exécuter",
+        "Une migration vide",
+        "Vos changements ET ceux des collègues : Doctrine compare le mapping à votre base locale, qui n'est pas à jour"
+      ],
+      "answer": 3,
+      "explanation": "La migration est la différence entre les entités et la base locale réelle. Toujours : git rebase, make sf-migrate, puis make sf-migration, et relire le SQL généré."
+    },
+    {
+      "question": "Ticket B3 : renseigner `completedAt` quand une tâche passe au statut done. Quel mécanisme le cours recommande-t-il ?",
+      "choices": [
+        "Un watch() côté front qui envoie un PATCH supplémentaire",
+        "Un UPDATE DQL exécuté après chaque flush()",
+        "Un entity listener (#[AsEntityListener] sur preUpdate) : classe isolée, injection possible, et hasChangedField('status') indique ce qui a changé",
+        "Un lifecycle callback #[ORM\\PreUpdate] sans #[ORM\\HasLifecycleCallbacks]"
+      ],
+      "answer": 2,
+      "explanation": "Le listener joue le rôle d'un watch() déclenché au moment de l'écriture en base, avec l'ancienne et la nouvelle valeur. Le callback dans l'entité est plus simple mais sans injection, et oublier HasLifecycleCallbacks le rend muet. Les UPDATE DQL ne déclenchent aucun de ces événements."
+    },
+    {
+      "question": "Lesquelles de ces recherches ne peuvent PAS s'écrire avec `findBy()` et demandent une méthode dédiée dans le repository ? (plusieurs réponses)",
+      "choices": [
+        "Les livres non épuisés (outOfPrint = false), triés par titre",
+        "Les livres dont le titre contient un mot (LIKE)",
+        "Les étiquettes dont le nom est dans une liste (IN)",
+        "Les livres de plus de 500 pages"
+      ],
+      "answer": [
+        1,
+        3
+      ],
+      "explanation": "Les critères de findBy() sont des égalités (un tableau de valeurs donne un IN), avec tri, limite et offset. Dès qu'il faut un LIKE, un >, une jointure ou un agrégat, on écrit une méthode nommée métier avec le QueryBuilder ou le DQL."
+    }
+  ],
+  "openQuestions": [
+    "Un collègue te dit : « l'EntityManager, c'est un store Pinia de mes entités ». Qu'est-ce qui est juste dans cette comparaison, et qu'est-ce qui est faux et dangereux ?",
+    "Décris les 4 états d'une entité Doctrine et les appels qui font passer de l'un à l'autre. Pourquoi `TaskController::update()` n'appelle-t-il pas `persist()` alors que `create()` le fait ?",
+    "Raconte ton workflow de migration pour ton ticket : commandes lancées, dans quel ordre, ce que tu as vérifié dans le fichier généré.",
+    "Pourquoi le projet impose-t-il `\\DateTimeImmutable` plutôt que `\\DateTime` dans les entités ? Fais le parallèle avec un piège de réactivité que tu connais en Vue."
+  ]
+}

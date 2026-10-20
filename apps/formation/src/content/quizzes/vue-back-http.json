@@ -1,0 +1,133 @@
+{
+  "id": "vue-back-http",
+  "title": "Le back-end et HTTP",
+  "questions": [
+    {
+      "question": "Le formulaire Vue refuse déjà un titre vide (champ `required` + message d'erreur). Pourquoi le back doit-il quand même valider le titre ?",
+      "choices": [
+        "Pour afficher le message d'erreur plus vite que le front",
+        "Parce que le navigateur ne transmet pas l'attribut `required` au serveur",
+        "Parce que le code du front tourne chez l'utilisateur : un simple `curl` contourne n'importe quel formulaire Vue",
+        "Il ne doit pas : valider deux fois est une duplication à éviter"
+      ],
+      "answer": 2,
+      "explanation": "Le back persiste, valide, autorise et orchestre. La validation du front est un confort (retour immédiat) ; seule celle du back garantit la donnée, car le front peut être lu, modifié ou ignoré."
+    },
+    {
+      "question": "Quel code doit renvoyer l'API pour cette requête ?",
+      "code": "curl -i -X POST http://localhost:8082/api/tasks \\\n     -H 'Content-Type: application/json' -d '{\"title\":\"\"}'",
+      "language": "bash",
+      "choices": [
+        "`400 Bad Request`",
+        "`422 Unprocessable Content`, avec la liste des `violations`",
+        "`200 OK` avec `{ \"success\": false }`",
+        "`409 Conflict`"
+      ],
+      "answer": 1,
+      "explanation": "Le JSON est lisible, mais les données sont invalides (titre vide) : c'est un 422, avec les violations pour que le front affiche l'erreur sous le bon champ. 400 est réservé à un corps illisible, comme `{title:`."
+    },
+    {
+      "question": "`PUT /api/tasks/1` renvoie une erreur alors que `GET /api/tasks/1` fonctionne. Quel code est attendu ?",
+      "choices": [
+        "`404 Not Found`",
+        "`400 Bad Request`",
+        "`403 Forbidden`",
+        "`405 Method Not Allowed`"
+      ],
+      "answer": 3,
+      "explanation": "La route existe, mais pas pour cette méthode : 405. Le 404 signifie que la ressource ou la route n'existe pas du tout (`GET /api/tasks/99999`)."
+    },
+    {
+      "question": "Bob est connecté (token valide) et tente de supprimer une tâche créée par Alice. Que répond le serveur ?",
+      "choices": [
+        "`403 Forbidden` : il sait qui est Bob, mais Bob n'a pas le droit",
+        "`401 Unauthorized` : Bob n'est pas autorisé",
+        "`404 Not Found` : la tâche n'appartient pas à Bob",
+        "`204 No Content` : la suppression est idempotente"
+      ],
+      "answer": 0,
+      "explanation": "401 = « qui êtes-vous ? » (pas de token, token invalide ou expiré). 403 = « je sais qui vous êtes, mais non ». Ici Bob est identifié, il n'a simplement pas le droit sur cette tâche."
+    },
+    {
+      "question": "Quelles méthodes sont idempotentes (1 ou 10 appels laissent la base dans le même état) ? (plusieurs réponses)",
+      "choices": ["`POST`", "`PUT`", "`DELETE`", "`GET`"],
+      "answer": [1, 2, 3],
+      "explanation": "GET ne modifie rien, PUT remplace entièrement, DELETE supprime (la seconde fois on répond 404, mais l'état est le même). POST crée : deux appels = deux tâches, d'où le sujet du double clic sur « Créer »."
+    },
+    {
+      "question": "Pourquoi une route `GET /api/deleteTask?id=3` est-elle dangereuse ?",
+      "choices": [
+        "Un GET ne peut pas transporter de paramètre `id`",
+        "Elle est plus lente qu'un DELETE",
+        "Un GET doit être sûr : navigateurs, proxys et robots se permettent de le rejouer ou de le précharger",
+        "Le navigateur bloque les GET qui contiennent le mot « delete »"
+      ],
+      "answer": 2,
+      "explanation": "GET est une méthode « sûre » : elle ne doit jamais écrire en base. En REST, on écrit `DELETE /api/tasks/3` : la ressource dans l'URL, l'action dans la méthode."
+    },
+    {
+      "question": "Que renvoie le serveur après un `POST /api/tasks` réussi ?",
+      "choices": [
+        "`201 Created`, l'en-tête `Location: /api/tasks/6` et la tâche créée en JSON",
+        "`200 OK` et un corps vide",
+        "`204 No Content` et l'en-tête `Location`",
+        "`201 Created` et uniquement l'`id` en texte brut"
+      ],
+      "answer": 0,
+      "explanation": "Une ressource créée se signale par un 201, avec l'en-tête Location qui indique où la retrouver, et le JSON de la tâche (id, createdAt… générés par le serveur). Le 204 sert au DELETE réussi."
+    },
+    {
+      "question": "Lesquelles de ces URL respectent le style REST du contrat ? (plusieurs réponses)",
+      "choices": [
+        "`PATCH /api/tasks/3`",
+        "`POST /api/createTask`",
+        "`GET /api/projects/1/tasks`",
+        "`POST /api/tasks/3/update`",
+        "`GET /api/tasks?status=todo&page=2`"
+      ],
+      "answer": [0, 2, 4],
+      "explanation": "REST expose des ressources (des noms) et agit dessus avec les méthodes HTTP (des verbes). Comme une route Vue Router, l'URL se lit comme une adresse : `/api/projects/1/tasks` = « les tâches du projet 1 ». Pas de verbe dans l'URL, et une lecture filtrée reste un GET avec query string."
+    },
+    {
+      "question": "Un dev habitué à Pinia écrit ceci dans le code PHP de la connexion. Que vaut `$GLOBALS['currentUser']` à la requête suivante ?",
+      "code": "<?php\n// Après un login réussi\n$GLOBALS['currentUser'] = $user;",
+      "language": "php",
+      "choices": [
+        "L'utilisateur connecté, comme dans un store Pinia",
+        "L'utilisateur connecté, mais seulement pour le même navigateur",
+        "Le dernier utilisateur connecté, quel que soit le client",
+        "Rien : le serveur est sans état, chaque requête repart de zéro"
+      ],
+      "answer": 3,
+      "explanation": "Un serveur HTTP ne garde rien entre deux requêtes ; en PHP, le script naît et meurt à chaque requête. Chaque requête reprouve qui elle est (token dans `Authorization`), et tout ce qui doit survivre va en base."
+    },
+    {
+      "question": "Un premier back renvoie toutes ses réponses en `200`, avec `{ \"success\": false }` en cas d'erreur. Quel est le problème principal ?",
+      "choices": [
+        "Le JSON est plus lourd à transférer",
+        "Le front ne peut plus s'appuyer sur `response.ok`, le monitoring ne voit pas les erreurs et le contrat devient flou",
+        "Le navigateur refuse les corps JSON sur une réponse 200",
+        "Aucun, c'est une convention aussi valable que les codes HTTP"
+      ],
+      "answer": 1,
+      "explanation": "Le code HTTP porte le résultat, le corps porte le détail. C'est le serveur qui choisit le code ; le front réagit à `response.ok` / `response.status`."
+    },
+    {
+      "question": "Vous voulez savoir quelles requêtes SQL l'API Symfony a exécutées pour répondre à un `GET /api/tasks`. Quel outil vous le montre ?",
+      "choices": [
+        "L'onglet Réseau du navigateur",
+        "`curl -i`",
+        "Le profiler Symfony (lien `X-Debug-Token-Link` de la réponse)",
+        "Les Vue DevTools"
+      ],
+      "answer": 2,
+      "explanation": "L'onglet Réseau et `curl -i` ne voient que la requête et la réponse HTTP. Le profiler Symfony montre tout ce qu'a fait le serveur : route, contrôleur, requêtes SQL, temps."
+    }
+  ],
+  "openQuestions": [
+    "Raconte le trajet complet d'un `fetch('/api/tasks', { method: 'POST', ... })` lancé depuis un composant Vue, jusqu'au `tasks.value.push(...)` : par où passe la requête, que fait le serveur, et dans quel ordre ?",
+    "Pour chacun de ces cas, quel code HTTP renvoies-tu et pourquoi : corps `{title:`, titre vide, pas de token, suppression de la tâche d'un autre, suppression d'un projet qui contient encore des tâches ?",
+    "« Le serveur est sans état » : qu'est-ce que ça change par rapport à un store Pinia ? Où est la vérité de la liste des tâches, et qu'est-ce que ça permet côté infrastructure ?",
+    "À quoi sert le contrat d'API, et que fais-tu si tu y trouves une ambiguïté ? Comment sait-on que ton API le respecte ?"
+  ]
+}

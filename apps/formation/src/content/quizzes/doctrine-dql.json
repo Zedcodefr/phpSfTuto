@@ -1,0 +1,115 @@
+{
+  "id": "doctrine-dql",
+  "title": "Doctrine : DQL & QueryBuilder",
+  "questions": [
+    {
+      "question": "Quelles affirmations sur le DQL sont vraies ? (plusieurs réponses)",
+      "code": "SELECT b FROM App\\Kata\\Entity\\Book b JOIN b.author a WHERE a.country = :country",
+      "language": "sql",
+      "choices": [
+        "On y manipule des classes et des propriétés (b.publishedAt), pas des tables et des colonnes (published_at)",
+        "La jointure sur une relation n'a pas besoin de clause ON",
+        "Une faute de frappe dans un nom de propriété est détectée à la compilation",
+        "`SELECT b` renvoie des objets Book"
+      ],
+      "answer": [0, 1, 3],
+      "explanation": "Le DQL est une chaîne : une erreur (« has no field or association named titel ») n'apparaît qu'à l'exécution. D'où les tests et make dql pour expérimenter."
+    },
+    {
+      "question": "Quel DQL produit ce QueryBuilder ?",
+      "code": "<?php\n$qb->where('t.id > 1')->where('t.name = :n');",
+      "choices": ["WHERE t.id > 1 AND t.name = :n", "WHERE t.name = :n — le second where() a écrasé le premier", "WHERE t.id > 1 OR t.name = :n", "Une exception : where() ne peut être appelé qu'une fois"],
+      "answer": 1,
+      "explanation": "where() remplace, andWhere() complète (comme select/addSelect, orderBy/addOrderBy). Règle simple : andWhere() partout, et getDQL() pour vérifier."
+    },
+    {
+      "question": "Pour une recherche insensible à la casse sur le titre, quelle écriture est correcte ?",
+      "choices": [
+        "`->andWhere(\"LOWER(b.title) LIKE '%$text%'\")`",
+        "`->andWhere('LOWER(b.title) LIKE %:text%')->setParameter('text', $text)`",
+        "`->andWhere('LOWER(b.title) LIKE :text')->setParameter('text', '%' . mb_strtolower($text) . '%')`",
+        "`->andWhere('b.title ILIKE :text')`"
+      ],
+      "answer": 2,
+      "explanation": "Jamais de concaténation (injection, apostrophes). Les % font partie de la VALEUR du paramètre. ILIKE est du SQL PostgreSQL, pas du DQL."
+    },
+    {
+      "question": "On veut le nombre de « pavés » (> 500 pages) par auteur, auteurs sans pavé compris (avec 0). Où mettre la condition sur les pages ?",
+      "code": "SELECT a.name, COUNT(b.id) FROM App\\Kata\\Entity\\Author a\nLEFT JOIN a.books b ???\nGROUP BY a.id",
+      "language": "sql",
+      "choices": ["Dans un WHERE b.pages > 500", "Dans la jointure : LEFT JOIN a.books b WITH b.pages > 500", "Dans un HAVING COUNT(b.pages) > 500", "Peu importe, le résultat est le même"],
+      "answer": 1,
+      "explanation": "Un WHERE sur la table de droite élimine les lignes sans correspondance et transforme le LEFT JOIN en INNER JOIN : les auteurs sans pavé disparaîtraient. Même piège qu'en SQL."
+    },
+    {
+      "question": "Quelle méthode d'exécution choisir ? Associez : « un livre par id, ou null s'il n'existe pas ».",
+      "choices": ["getResult()", "getOneOrNullResult()", "getSingleResult()", "getSingleScalarResult()"],
+      "answer": 1,
+      "explanation": "getSingleResult() lève NoResultException s'il n'y a rien. getOneOrNullResult() renvoie null (et lève NonUniqueResultException s'il y a plusieurs résultats)."
+    },
+    {
+      "question": "Avec PostgreSQL, que renvoie `AVG(r.rating)` dans un résultat scalaire ?",
+      "choices": ["Un float", "Une chaîne, par exemple \"4.0714285714285714\" : il faut convertir explicitement", "Un int arrondi", "null"],
+      "answer": 1,
+      "explanation": "AVG revient en string (précision numérique), COUNT et SUM en int. Convertir avec (float) et round() avant de renvoyer la valeur."
+    },
+    {
+      "question": "On pagine des livres avec un fetch join sur leurs critiques : `setMaxResults(3)`. Quel est le risque ?",
+      "choices": [
+        "Aucun",
+        "LIMIT s'applique aux lignes SQL : on peut obtenir des livres avec seulement une partie de leurs critiques, sans aucune erreur",
+        "Doctrine lève une exception",
+        "Seules 3 critiques au total sont chargées, mais tous les livres sont renvoyés"
+      ],
+      "answer": 1,
+      "explanation": "Une jointure sur une collection produit une ligne par élément. Le Paginator Doctrine récupère d'abord les ids de la page puis les entités complètes, et count($paginator) donne le total (X-Total-Count)."
+    },
+    {
+      "question": "Quels sont les avantages d'un `SELECT NEW App\\Dto\\TagStats(t.name, SIZE(t.books))` ? (plusieurs réponses)",
+      "choices": [
+        "Aucune entité n'est chargée ni suivie par l'Unit of Work",
+        "Les arguments sont passés dans l'ordre au constructeur du DTO",
+        "Le DTO peut ensuite être modifié puis flushé pour mettre à jour la base",
+        "Pas de risque de N+1 sur une liste en lecture seule"
+      ],
+      "answer": [0, 1, 3],
+      "explanation": "Le DTO n'est pas une entité : Doctrine ne le suit pas et ne l'écrira jamais en base. C'est l'équivalent d'un .Select(t => new TagStats(...)) en LINQ."
+    },
+    {
+      "question": "Un `UPDATE App\\Entity\\Task t SET t.status = :done WHERE ...` exécuté avec `execute()` : quelles affirmations sont vraies ? (plusieurs réponses)",
+      "choices": [
+        "Il renvoie le nombre de lignes modifiées",
+        "Les entités déjà en mémoire gardent leurs anciennes valeurs",
+        "Les listeners preUpdate (ex. updatedAt) sont déclenchés",
+        "Une seule requête SQL est exécutée, aucune entité n'est chargée"
+      ],
+      "answer": [0, 1, 3],
+      "explanation": "Les UPDATE/DELETE DQL contournent l'Unit of Work : ni événements, ni cascade, ni orphanRemoval. Idéal pour du traitement de masse à la logique triviale."
+    },
+    {
+      "question": "Comment obtenir, en une requête, chaque étiquette ET son nombre de livres, tout en récupérant l'entité Tag ?",
+      "code": "<?php\n$rows = $em->createQuery('SELECT t, SIZE(t.books) AS nb FROM App\\Kata\\Entity\\Tag t')->getResult();",
+      "choices": [
+        "$rows est une liste de Tag, nb est perdu",
+        "Résultat mixte : $rows[0][0] est l'objet Tag, $rows[0]['nb'] le nombre",
+        "Erreur : on ne peut pas mélanger entité et scalaire",
+        "$rows[0]->nb contient le nombre"
+      ],
+      "answer": 1,
+      "explanation": "C'est l'outil pour taskCount (B1) ou commentCount (B3) sans N+1. Avec `AS HIDDEN nb`, on peut trier sur la valeur sans la renvoyer."
+    },
+    {
+      "question": "Quel est le premier réflexe pour comprendre pourquoi une requête du QueryBuilder ne renvoie pas ce qu'on attend ?",
+      "choices": ["Ajouter des var_dump dans le repository", "Afficher getDQL() (ou --show-sql / onglet Doctrine du profiler) et rejouer la requête avec make dql", "Passer en SQL natif", "Vider le cache Symfony"],
+      "answer": 1,
+      "explanation": "Lire le DQL et le SQL réellement générés révèle les where() écrasés, les parenthèses autour des OR, les jointures manquantes."
+    }
+  ],
+  "openQuestions": [
+    "Explique K06 du kata : pourquoi `addSelect` change tout, et comment le test vérifie que les critiques sont chargées sans requête supplémentaire.",
+    "Explique K12 : pourquoi une requête UPDATE DQL plutôt que charger et modifier les livres ? Quelles en sont les conséquences sur l'Unit of Work ?",
+    "Montre la requête de filtres de ton ticket (ou K09) : comment se construit-elle quand un critère est absent ? Lis le DQL généré à voix haute.",
+    "Explique ta pagination : comment calcules-tu l'offset, d'où vient le total X-Total-Count, et pourquoi le Paginator plutôt que setMaxResults seul ?",
+    "Choisis une requête que tu as écrite et donne le SQL que Doctrine génère. Quels index PostgreSQL utilise-t-elle (EXPLAIN) ?"
+  ]
+}

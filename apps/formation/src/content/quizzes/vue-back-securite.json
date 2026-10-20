@@ -1,0 +1,150 @@
+{
+  "id": "vue-back-securite",
+  "title": "Sécurité côté serveur",
+  "questions": [
+    {
+      "question": "Votre formulaire Vue impose un titre d'au moins 3 caractères et un statut choisi dans une liste. Que se passe-t-il avec cette requête si le serveur ne valide rien ?",
+      "code": "curl -i -X POST http://localhost:8082/api/tasks \\\n     -H 'Content-Type: application/json' \\\n     -d '{\"title\":\"\", \"status\":\"nimporte\"}'",
+      "language": "bash",
+      "choices": [
+        "Le navigateur bloque la requête, car elle ne vient pas du formulaire",
+        "Rien : les règles du formulaire Vue s'appliquent aussi à l'API",
+        "La tâche invalide entre en base",
+        "La requête échoue avec une erreur CORS"
+      ],
+      "answer": 2,
+      "explanation": "curl n'utilise ni le front ni le navigateur. La validation front est un confort ; la validation back est la seule garantie. L'API Symfony du projet répond 422 avec la liste des violations."
+    },
+    {
+      "question": "Le front envoie un objet typé `Task` en TypeScript. Que peut contenir le JSON reçu par le serveur ?",
+      "choices": [
+        "N'importe quoi : les types TypeScript sont effacés à l'exécution et la requête peut être fabriquée à la main",
+        "Exactement le type `Task`, puisque le front compile avec TypeScript",
+        "Le type `Task` ou `null`",
+        "Le type `Task`, sauf si l'utilisateur modifie le code dans les DevTools"
+      ],
+      "answer": 0,
+      "explanation": "Tout ce qui vient de la requête est hostile (corps, paramètres d'URL, en-têtes, cookies) : on valide le type, la forme, les bornes, les valeurs autorisées, puis on vérifie les droits."
+    },
+    {
+      "question": "Le client appelle `?search=' OR 1=1 --`. Que renvoie ce code ?",
+      "code": "<?php\n$search = $_GET['search'];\n$sql = \"SELECT * FROM task WHERE title LIKE '%$search%'\";\n$rows = $pdo->query($sql)->fetchAll();",
+      "language": "php",
+      "choices": [
+        "Aucune tâche : aucun titre ne contient ce texte",
+        "Toute la table : la valeur est devenue du code SQL",
+        "Une erreur de syntaxe SQL, donc aucun risque",
+        "Les tâches dont le titre contient `OR 1=1`"
+      ],
+      "answer": 1,
+      "explanation": "La requête devient `... LIKE '%' OR 1=1 --%'` : la condition est toujours vraie et le reste est commenté. Avec d'autres valeurs, on peut lire d'autres tables, voire modifier ou supprimer des données."
+    },
+    {
+      "question": "Quelle est la bonne façon d'écrire cette recherche ?",
+      "choices": [
+        "`$pdo->query(\"SELECT * FROM task WHERE title ILIKE '%\" . addslashes($search) . \"%'\")`",
+        "Valider `$search` côté Vue pour refuser les apostrophes, puis concaténer",
+        "`$pdo->query(\"SELECT * FROM task WHERE title ILIKE '%\" . htmlspecialchars($search) . \"%'\")`",
+        "`$statement = $pdo->prepare('SELECT * FROM task WHERE title ILIKE :search'); $statement->execute(['search' => '%' . $search . '%']);`"
+      ],
+      "answer": 3,
+      "explanation": "Avec une requête préparée, la requête et les valeurs voyagent séparément : la valeur ne peut jamais devenir du SQL. C'est l'équivalent back de « jamais de `v-html` avec une donnée utilisateur ». Doctrine le fait via `setParameter()`."
+    },
+    {
+      "question": "Un utilisateur crée une tâche nommée `<img src=x onerror=alert(1)>`. Quelles mesures sont les bonnes ? (plusieurs réponses)",
+      "choices": [
+        "Supprimer les balises HTML du titre avant l'INSERT",
+        "Afficher le titre avec `{{ task.title }}` côté Vue, jamais avec `v-html`",
+        "Renvoyer la réponse avec `Content-Type: application/json`",
+        "Refuser toute requête dont le corps contient le caractère `<`"
+      ],
+      "answer": [1, 2],
+      "explanation": "L'API stocke et renvoie le texte tel quel ; l'échappement HTML se fait à l'affichage (Vue échappe `{{ }}` automatiquement). Le back renvoie du JSON pour que le navigateur ne l'interprète jamais comme du HTML, et ne « nettoie » pas la donnée en base : ça l'abîmerait."
+    },
+    {
+      "question": "Comment stocker le mot de passe d'un utilisateur ?",
+      "choices": [
+        "`hash('sha256', $password)` : c'est un algorithme moderne",
+        "Chiffré avec une clé secrète, pour pouvoir le renvoyer en cas d'oubli",
+        "`password_hash($password, PASSWORD_DEFAULT)`, vérifié ensuite avec `password_verify()`",
+        "`md5($password . $sel)` avec un sel aléatoire"
+      ],
+      "answer": 2,
+      "explanation": "On stocke un hash à sens unique, lent exprès, avec un sel aléatoire intégré (bcrypt, Argon2id). md5, sha1 et sha256 sont bien trop rapides (des milliards d'essais par seconde) ; un chiffrement réversible n'est pas acceptable."
+    },
+    {
+      "question": "À la connexion, l'API répond « email inconnu » ou « mot de passe incorrect » selon le cas. Quel est le problème ?",
+      "choices": [
+        "Un attaquant peut deviner quels emails ont un compte",
+        "Ces messages ne respectent pas le format des erreurs du contrat",
+        "Aucun, c'est plus clair pour l'utilisateur",
+        "Le front ne peut pas afficher deux messages différents"
+      ],
+      "answer": 0,
+      "explanation": "Des messages distincts révèlent l'existence d'un compte. On renvoie un message unique quel que soit le cas."
+    },
+    {
+      "question": "Pour créer un commentaire, le front envoie `{ \"content\": \"...\", \"userId\": 3 }` avec un token Bearer. À qui le serveur rattache-t-il le commentaire ?",
+      "choices": [
+        "À l'utilisateur 3, puisque le front l'a indiqué",
+        "À l'utilisateur déduit du token ; le `userId` du corps est ignoré ou refusé",
+        "À l'utilisateur 3, si le token est valide",
+        "Au premier administrateur trouvé en base"
+      ],
+      "answer": 1,
+      "explanation": "Le serveur ne fait jamais confiance à un identifiant envoyé par le client : à chaque requête, il retrouve le token en base, vérifie son expiration et charge l'utilisateur courant."
+    },
+    {
+      "question": "Le serveur vérifie qu'un token est présent et valide avant `DELETE /api/tasks/{id}`, mais rien d'autre. Bob change l'`id` dans l'URL. Que manque-t-il ?",
+      "choices": [
+        "Rien : Bob est authentifié, il a donc le droit",
+        "Une règle CORS qui empêche Bob d'appeler cette URL",
+        "Masquer le bouton « Supprimer » pour les tâches des autres",
+        "Vérifier que Bob a le droit sur CETTE tâche, sinon répondre `403`"
+      ],
+      "answer": 3,
+      "explanation": "Authentifié ne veut pas dire autorisé. La question à chaque action : « cet utilisateur peut-il faire cette action sur CETTE ressource ? ». Dans Symfony, ces règles s'écrivent dans des voters."
+    },
+    {
+      "question": "Quelle affirmation sur CORS est juste ?",
+      "choices": [
+        "CORS protège l'API contre les appels non autorisés, y compris depuis `curl`",
+        "C'est le front qui déclare les origines autorisées, dans la config de Vite",
+        "CORS est appliqué par le navigateur, sur autorisation du serveur : ce n'est pas une protection de l'API",
+        "Mettre `Access-Control-Allow-Origin: *` est recommandé avec les cookies"
+      ],
+      "answer": 2,
+      "explanation": "Le navigateur demande (preflight `OPTIONS`) si l'origine peut lire les réponses, et le serveur répond avec `Access-Control-Allow-Origin`. curl ou un autre serveur l'ignorent. On liste des origines précises, jamais `*` avec des cookies."
+    },
+    {
+      "question": "Un dev ajoute cette variable pour appeler un service de paiement depuis le front. Quel est le problème ?",
+      "code": "# .env du front Vite\nVITE_PAYMENT_SECRET_KEY=sk_live_abc123",
+      "language": "bash",
+      "choices": [
+        "Les variables `VITE_*` sont copiées dans le bundle JS : n'importe qui peut lire la clé",
+        "Vite ne lit pas les variables dont le nom contient `SECRET`",
+        "Il faudrait la mettre dans `localStorage` à la place",
+        "Aucun, tant que le fichier `.env` n'est pas commité"
+      ],
+      "answer": 0,
+      "explanation": "Un secret ne va jamais dans une variable `VITE_*` : il vit côté serveur (`%env(...)%`, `.env.local` ignoré par Git, variables d'environnement). Et un secret qui a fuité est compromis : on le change."
+    },
+    {
+      "question": "En production, une exception inattendue survient. Que doit contenir la réponse `500` ?",
+      "choices": [
+        "Le message de l'exception (`$e->getMessage()`) pour aider le front",
+        "Un message générique ; les détails partent dans les logs",
+        "La trace complète, pour que le support puisse diagnostiquer",
+        "La requête SQL qui a échoué"
+      ],
+      "answer": 1,
+      "explanation": "Chemins de fichiers, versions, requêtes SQL : autant d'indices pour un attaquant. En `APP_ENV=prod`, Symfony renvoie un message neutre ; on journalise l'erreur au lieu de l'exposer."
+    }
+  ],
+  "openQuestions": [
+    "Pourquoi dit-on que le back est le seul endroit où la sécurité est réelle ? Donne un exemple concret de contournement du front avec `curl`, et ce que le serveur doit faire.",
+    "Explique une injection SQL avec un exemple, puis ce qui change avec une requête préparée. Quel parallèle peux-tu faire avec `v-html` ?",
+    "Raconte ce qui se passe côté serveur de la connexion jusqu'à une requête `DELETE` sur une tâche : comment le mot de passe est-il vérifié, comment l'utilisateur est-il retrouvé, et quand renvoie-t-on `401` ou `403` ?",
+    "Ton collègue dit « on a configuré CORS, l'API est protégée » et veut mettre une clé d'API dans une variable `VITE_*`. Que lui réponds-tu sur les deux points ?"
+  ]
+}

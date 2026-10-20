@@ -1,0 +1,80 @@
+{
+  "id": "symfony-principes",
+  "title": "Principes de Symfony",
+  "questions": [
+    {
+      "question": "Où le routing est-il exécuté dans le cycle de vie d'une requête Symfony ?",
+      "choices": ["Dans public/index.php, avant le Kernel", "Par le RouterListener, un listener de l'événement kernel.request", "Dans le constructeur du contrôleur", "Par nginx, grâce à try_files"],
+      "answer": 1,
+      "explanation": "Le routing est un simple listener de kernel.request qui détermine le _controller. nginx se contente d'envoyer toutes les requêtes non statiques vers public/index.php."
+    },
+    {
+      "question": "En ASP.NET Core, l'ordre d'exécution des middlewares est l'ordre d'enregistrement (`app.UseXxx()`). Comment Symfony ordonne-t-il ses « middlewares » ?",
+      "choices": ["Par ordre alphabétique des classes", "Par une priorité sur chaque listener d'un événement (plus grand = plus tôt)", "Par l'ordre des fichiers dans config/packages", "Il n'y a qu'un listener par événement"],
+      "answer": 1,
+      "explanation": "Symfony a une séquence fixe d'événements (kernel.request, kernel.controller, ...). Chaque listener s'y abonne avec une priorité ; `debug:event-dispatcher kernel.request` montre l'ordre réel."
+    },
+    {
+      "question": "Vous créez `src/Service/TaskStatsService.php` et vous l'ajoutez au constructeur de `TaskController`. Que devez-vous enregistrer dans la configuration ?",
+      "choices": ["Une ligne `App\\Service\\TaskStatsService: ~` dans services.yaml", "Rien : toute classe de src/ est un service et l'autowiring l'injecte d'après le type", "Un `#[Service]` sur la classe", "Une entrée dans config/bundles.php"],
+      "answer": 1,
+      "explanation": "services.yaml déclare `App\\: resource: '../src/'` avec autowire et autoconfigure : toute classe est un service injectable par son type. `debug:autowiring` aide à trouver le bon type."
+    },
+    {
+      "question": "Qu'est-ce qui se passe AVANT l'entrée dans la méthode suivante, pour `PATCH /api/tasks/7` ? (plusieurs réponses)",
+      "code": "<?php\n#[Route('/{id}', requirements: ['id' => '\\d+'], methods: ['PATCH'])]\npublic function update(Task $task, #[MapRequestPayload] UpdateTaskInput $input): JsonResponse",
+      "language": "php",
+      "choices": ["La tâche 7 est chargée en base, ou une 404 est renvoyée", "Le JSON est désérialisé dans UpdateTaskInput", "Les contraintes de UpdateTaskInput sont validées, sinon une 422 est renvoyée", "La tâche est automatiquement mise à jour avec les valeurs du DTO"],
+      "answer": [0, 1, 2],
+      "explanation": "EntityValueResolver charge l'entité (404 si absente), RequestPayloadValueResolver désérialise et valide (422). Appliquer les valeurs du DTO à l'entité reste le travail du contrôleur."
+    },
+    {
+      "question": "Quel est l'équivalent Symfony de `db.SaveChanges()` d'EF Core ?",
+      "choices": ["`$em->persist($entity)`", "`$em->flush()`", "`$repository->save()`", "`$em->commit()`"],
+      "answer": 1,
+      "explanation": "persist() demande à Doctrine de suivre un NOUVEL objet (≈ Add), flush() calcule et exécute le SQL de tous les changements suivis, dans une transaction (≈ SaveChanges)."
+    },
+    {
+      "question": "Une API en production est hébergée sur PHP-FPM. Un service Symfony « partagé » (comportement par défaut) correspond en pratique à quelle durée de vie .NET ?",
+      "choices": ["Singleton de toute l'application", "Scoped : une instance par requête, puisque le conteneur est reconstruit à chaque requête", "Transient : une instance par injection", "Aucune, les services ne sont pas instanciés"],
+      "answer": 1,
+      "explanation": "Le service est partagé dans un conteneur, mais en PHP-FPM chaque requête recrée le conteneur (share nothing). « Singleton » Symfony ≈ « scoped » ASP.NET. `shared: false` ≈ transient."
+    },
+    {
+      "question": "Dans quel ordre les fichiers de variables d'environnement sont-ils chargés (le dernier gagne) ?",
+      "choices": [
+        "`.env.local` → `.env` → variables réelles",
+        "`.env` → `.env.local` → `.env.$APP_ENV` → `.env.$APP_ENV.local` → variables d'environnement réelles",
+        "Variables réelles → `.env` → `.env.local`",
+        "Seul `.env.$APP_ENV` est lu"
+      ],
+      "answer": 1,
+      "explanation": ".env est commité avec les valeurs par défaut, .env.local (jamais commité) contient vos surcharges et secrets, et les vraies variables d'environnement l'emportent sur tout."
+    },
+    {
+      "question": "Vous avez modifié une valeur dans config/packages et rien ne change. Quelle est la cause la plus probable et la commande à lancer ?",
+      "choices": ["Il faut redémarrer nginx : `make restart`", "La configuration est compilée dans var/cache : `make sf-cc`", "Il faut relancer `composer install`", "Il faut une migration : `make sf-migrate`"],
+      "answer": 1,
+      "explanation": "Le conteneur, les routes et le mapping sont compilés en PHP dans var/cache. En dev, la recompilation est en principe automatique, mais un cache:clear règle les cas « fantômes » (et il est obligatoire à chaque déploiement en prod)."
+    },
+    {
+      "question": "Quelle commande répond à la question « quelle route va traiter `PATCH /api/tasks/3` ? »",
+      "choices": ["`make sf c=\"debug:container\"`", "`make sf c=\"router:match /api/tasks/3 --method=PATCH\"`", "`make sf c=\"debug:autowiring Router\"`", "`make sf c=\"debug:config framework\"`"],
+      "answer": 1,
+      "explanation": "router:match simule la résolution d'une URL. debug:router (make sf-routes) liste toutes les routes, debug:container et debug:autowiring concernent les services."
+    },
+    {
+      "question": "Une 404 renvoyée par l'API Symfony contient une trace complète dans le JSON. Pourquoi, et faut-il s'en inquiéter ?",
+      "choices": ["C'est un bug du ProblemNormalizer à corriger", "En dev (APP_ENV=dev), le détail inclut le message, la classe et la trace ; en prod seul le texte HTTP standard est renvoyé", "Il faut retirer `format: 'json'` de la route", "C'est le comportement en prod, il faut ajouter un listener"],
+      "answer": 1,
+      "explanation": "Les erreurs sont rendues différemment selon l'environnement. Ne mettez pas d'information sensible dans les messages d'exception et ne testez pas la valeur exacte de `detail`."
+    }
+  ],
+  "openQuestions": [
+    "Raconte le trajet d'une requête `POST /api/tasks` dans Symfony, de public/index.php à la réponse 201 : événements du kernel, argument resolvers, contrôleur, sérialisation.",
+    "Pour chaque fichier de ton API PHP pur (index.php, Router, Request/JsonResponse, HttpException, Connection, TaskRepository, TaskValidator, Task::jsonSerialize), indique ce qui le remplace dans Symfony.",
+    "Explique l'autowiring à un collègue .NET : comment Symfony sait-il quoi injecter dans le constructeur de TaskController, et que fait-on quand il y a deux implémentations d'une interface ?",
+    "Où configurerais-tu une durée de validité de token de 24 h, et comment arrive-t-elle dans un service ? Suis le chemin depuis .env.",
+    "Montre comment ajouter un en-tête `X-Api-Version` à toutes les réponses. Pourquoi est-ce l'équivalent d'un middleware ASP.NET Core ?"
+  ]
+}

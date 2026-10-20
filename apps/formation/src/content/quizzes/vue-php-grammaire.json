@@ -1,0 +1,166 @@
+{
+  "id": "vue-php-grammaire",
+  "title": "La grammaire PHP",
+  "questions": [
+    {
+      "question": "Qu'affiche ce code ?",
+      "code": "<?php\n$a = '5';\n$b = '3';\necho $a + $b;\necho ' / ';\necho $a . $b;",
+      "choices": [
+        "`53 / 53`",
+        "`8 / 53`",
+        "`8 / 8`",
+        "TypeError : Unsupported operand types"
+      ],
+      "answer": 1,
+      "explanation": "En PHP, `+` est uniquement arithmétique : deux chaînes numériques sont additionnées (8). La concaténation s'écrit avec le point `.` (\"53\"). Le réflexe JS `'a' + 'b'` ne fonctionne jamais."
+    },
+    {
+      "question": "Avec `$id = 42;`, lesquelles de ces lignes affichent `Task 42 not found` ? (plusieurs réponses)",
+      "choices": [
+        "`echo \"Task $id not found\";`",
+        "`echo 'Task $id not found';`",
+        "`echo \"Task {$id} not found\";`",
+        "`echo 'Task ' + $id + ' not found';`"
+      ],
+      "answer": [
+        0,
+        2
+      ],
+      "explanation": "L'interpolation n'a lieu qu'entre guillemets doubles (≈ template literal) ; entre apostrophes, `$id` reste tel quel. Et `+` ne concatène pas : la dernière ligne lève une TypeError."
+    },
+    {
+      "question": "Qu'affiche ce code ?",
+      "code": "<?php\nfunction addTag(array $tags): void { $tags[] = 'php'; }\nfunction rename(Task $t): void { $t->title = 'Nouveau'; }\n\n$tags = ['vue'];\n$task = new Task('Ancien');\naddTag($tags);\nrename($task);\n\necho count($tags) . ' ' . $task->title;",
+      "choices": [
+        "`2 Nouveau`",
+        "`1 Ancien`",
+        "`1 Nouveau`",
+        "`2 Ancien`"
+      ],
+      "answer": 2,
+      "explanation": "Un `array` PHP est copié à l'affectation et au passage en argument : `addTag()` modifie sa copie, `$tags` garde 1 élément. Un objet, lui, est partagé comme en JS : `rename()` modifie bien la tâche. Pour modifier un tableau depuis une fonction, on le renvoie."
+    },
+    {
+      "question": "Le front Vue attend un tableau JSON. Que renvoie `json_encode($even)` ?",
+      "code": "<?php\n$numbers = [1, 2, 3, 4];\n$even = array_filter($numbers, fn (int $n) => $n % 2 === 0);",
+      "choices": [
+        "`[2,4]`",
+        "`{\"1\":2,\"3\":4}`",
+        "`[null,2,null,4]`",
+        "`{\"0\":2,\"1\":4}`"
+      ],
+      "answer": 1,
+      "explanation": "`array_filter` conserve les clés d'origine (1 et 3). Les clés n'étant plus 0..n-1, `json_encode` produit un objet JSON, et `tasks.map(...)` plantera côté front. Il faut `array_values()` pour revenir à une liste."
+    },
+    {
+      "question": "Quel appel est l'équivalent PHP de `tasks.map(t => t.title)` ?",
+      "choices": [
+        "`$tasks->map(fn ($t) => $t->title)`",
+        "`array_map($tasks, fn ($t) => $t->title)`",
+        "`array_map(fn ($t) => { return $t->title; }, $tasks)`",
+        "`array_map(fn ($t) => $t->title, $tasks)`"
+      ],
+      "answer": 3,
+      "explanation": "Les tableaux PHP n'ont pas de méthodes : ce sont des fonctions globales, sans chaînage. `array_map` prend la fonction d'abord, alors que `array_filter` prend le tableau d'abord. Et `fn` ne contient qu'une expression, sans accolades ni `return`."
+    },
+    {
+      "question": "Lesquelles de ces expressions valent `true` en PHP 8 ? (plusieurs réponses)",
+      "choices": [
+        "`'1' == '01'`",
+        "`'abc' == 0`",
+        "`null == false`",
+        "`in_array('1e1', ['10'])`",
+        "`0 == ''`"
+      ],
+      "answer": [
+        0,
+        2,
+        3
+      ],
+      "explanation": "`==` existe aussi en JS, mais ses règles de conversion ne sont pas les mêmes : deux chaînes numériques sont comparées comme des nombres ('1' == '01', '1e1' == '10'), et `in_array` compare en `==` par défaut. Depuis PHP 8, 'abc' == 0 et 0 == '' valent false. Règle : `===` partout, et `true` en 3ᵉ argument de `in_array`."
+    },
+    {
+      "question": "Lesquelles de ces valeurs sont falsy en PHP alors qu'elles sont truthy en JavaScript ? (plusieurs réponses)",
+      "choices": [
+        "`'0'`",
+        "`' '` (une espace)",
+        "`[]` (tableau vide)",
+        "`'false'`"
+      ],
+      "answer": [
+        0,
+        2
+      ],
+      "explanation": "En PHP, la chaîne '0' et le tableau vide sont falsy. Un `if ($title)` rejetterait donc un titre « 0 » : testez explicitement (`$title !== ''`, `count($a) === 0`). ' ' et 'false' sont des chaînes non vides, truthy dans les deux langages."
+    },
+    {
+      "question": "Un PATCH reçoit le corps `{\"description\": null}`. Qu'affiche ce code ?",
+      "code": "<?php\n$data = ['description' => null];\nvar_dump(isset($data['description']));\nvar_dump(array_key_exists('description', $data));",
+      "choices": [
+        "`bool(true) bool(true)`",
+        "`bool(false) bool(false)`",
+        "`bool(true) bool(false)`",
+        "`bool(false) bool(true)`"
+      ],
+      "answer": 3,
+      "explanation": "`isset()` répond false pour une clé qui vaut `null` ; `array_key_exists()` dit seulement si la clé est présente (≈ `'description' in body`). Pour un PATCH, « clé à null » veut dire « effacer » et « clé absente » veut dire « ne pas toucher » : c'est `array_key_exists()` qu'il faut."
+    },
+    {
+      "question": "Qu'affiche ce code ? (en JavaScript, l'équivalent afficherait 2)",
+      "code": "<?php\n$x = 1;\n$f = fn () => $x;\n$x = 2;\necho $f();",
+      "choices": [
+        "`2`",
+        "`1`",
+        "Warning : Undefined variable `$x`",
+        "`null`"
+      ],
+      "answer": 1,
+      "explanation": "La fonction fléchée `fn` capture automatiquement les variables utilisées, mais par valeur, au moment de sa création. Une `function () { ... }` ne voit rien de l'extérieur sans `use ($x)`, et capture aussi par valeur (sauf `use (&$x)`)."
+    },
+    {
+      "question": "Dans `src/Controller/TaskController.php` (namespace `App\\Controller`), cette ligne provoque une erreur. Pourquoi ?",
+      "code": "<?php\nnamespace App\\Controller;\n\n$now = new DateTimeImmutable();",
+      "choices": [
+        "PHP cherche la classe `App\\Controller\\DateTimeImmutable` : il faut écrire `\\DateTimeImmutable` ou ajouter `use DateTimeImmutable;`",
+        "Il faut d'abord faire `require 'DateTimeImmutable.php'`",
+        "`DateTimeImmutable` n'existe qu'à partir de PHP 9",
+        "Il faut l'importer avec `import { DateTimeImmutable } from 'php'`"
+      ],
+      "answer": 0,
+      "explanation": "Dans un fichier qui déclare un namespace, un nom de classe sans `\\` initial est résolu dans ce namespace : « Class \"App\\Controller\\DateTimeImmutable\" not found ». Les classes natives (`\\PDO`, `\\DateTimeImmutable`, `\\JsonException`) s'écrivent avec un `\\` initial."
+    },
+    {
+      "question": "Que se passe-t-il à l'appel de `greet(new Duck())` ?",
+      "code": "<?php\ninterface HasName { public function name(): string; }\nclass Duck { public function name(): string { return 'duck'; } }\n\nfunction greet(HasName $n): string { return $n->name(); }\n\necho greet(new Duck());",
+      "choices": [
+        "Affiche « duck » : Duck a bien une méthode `name()`, comme le typage structurel de TypeScript",
+        "Erreur de syntaxe au chargement du fichier",
+        "Affiche une chaîne vide",
+        "TypeError à l'exécution : Duck n'implémente pas HasName"
+      ],
+      "answer": 3,
+      "explanation": "Le typage PHP est nominal : une classe doit déclarer `implements HasName` pour être acceptée, même si elle a les bonnes méthodes. Et c'est vérifié à l'exécution, pas par un compilateur."
+    },
+    {
+      "question": "Quelles affirmations sur l'enum `TaskStatus: string` (cas `Todo = 'todo'`, `Done = 'done'`…) sont vraies ? (plusieurs réponses)",
+      "choices": [
+        "`TaskStatus::from('nope')` lève une ValueError",
+        "`TaskStatus::tryFrom('nope')` renvoie `null`",
+        "Comme une union TS `'todo' | 'done'`, on peut écrire `$task->status === 'done'`",
+        "`json_encode(TaskStatus::Done)` produit `\"done\"`"
+      ],
+      "answer": [
+        0,
+        1,
+        3
+      ],
+      "explanation": "Un enum PHP est un vrai type, pas une chaîne : `TaskStatus::Done === 'done'` vaut false. On compare avec `=== TaskStatus::Done`, ou on lit la valeur avec `->value`. `from()` convertit une donnée externe, `tryFrom()` permet de valider sans exception."
+    }
+  ],
+  "openQuestions": [
+    "Explique la différence entre un array PHP et un objet quand on les affecte à une autre variable ou qu'on les passe à une fonction, en comparant avec JavaScript. Où cela a-t-il compté dans ton code ?",
+    "Montre une closure de ton code (`fn` ou `function () use (...)`) : qu'est-ce qu'elle capture, et comment ? En quoi est-ce différent d'une arrow function JavaScript ?",
+    "Dans ton code, comment distingues-tu « clé absente » et « clé à null » dans un corps JSON (`isset`, `array_key_exists`, `??`) ? Pourquoi est-ce important pour un PATCH ?",
+    "Explique la constructor promotion et `readonly` sur la classe Task ou JsonResponse, en les comparant à `constructor(public readonly id: number)` en TypeScript : qu'est-ce que PHP génère pour toi, et qu'est-ce qui est interdit ensuite ?"
+  ]
+}
