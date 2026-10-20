@@ -18,6 +18,8 @@ Toute question fonctionnelle se tranche en relisant le contrat ; s'il est ambigu
 ## Avant de commencer (chaque participant)
 
 - [ ] Docker (Docker Desktop / OrbStack, ou WSL 2 sous Windows) et `make` installés.
+  Sous VS Code, le **devcontainer** fourni suffit : Docker + extension *Dev Containers*, puis *Reopen in Container*
+  (`make` et les extensions PHP / Xdebug y sont déjà ; toutes les commandes du parcours s'y lancent telles quelles).
 - [ ] Projet récupéré (application de formation → **Ressources** → `taskboard-projet.zip`, ou dépôt Git).
 - [ ] `make install` terminé sans erreur, puis http://localhost:5173 affiche le front.
 - [ ] `make sf-check` affiche « TOUT EST VERT ».
@@ -135,4 +137,6 @@ Votre progression et vos scores sont enregistrés **dans votre navigateur** : il
 | Kata : « Données du kata absentes » | Lancer `make sf-kata`, pas `bin/phpunit` directement (les fixtures du kata doivent être chargées) |
 | Le front affiche « Impossible de charger les tâches » | L'API choisie répond-elle ? `curl localhost:8081/api/tasks` ; `make use-php` / `make use-symfony` |
 | Permissions sur les fichiers générés (Linux) | Les conteneurs tournent avec votre UID : relancer via `make`, pas `docker compose` directement |
+| Devcontainer : `curl localhost:…` ne répond pas | La stack est-elle démarrée (`make up`) ? Puis relancer les relais de ports : `bash .devcontainer/forward-ports.sh` |
+| Devcontainer : Xdebug ne s'arrête pas sur le point d'arrêt | Le port 9003 est-il pris sur la machine (PhpStorm, autre devcontainer) ? `XDEBUG_MODE=debug make up` lancé ? |
 | Repartir de zéro | `make clean && make install` (⚠️ supprime les données) |

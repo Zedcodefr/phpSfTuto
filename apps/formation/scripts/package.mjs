@@ -63,7 +63,7 @@ const report = []
 
 // 1. Projet de départ
 const project = {}
-for (const path of ['README.md', 'Makefile', 'compose.yaml', '.editorconfig', '.gitignore', '.vscode', 'docker', 'docs', 'apps/api-php', 'apps/api-symfony', 'apps/front']) {
+for (const path of ['README.md', 'Makefile', 'compose.yaml', '.editorconfig', '.gitignore', '.vscode', '.devcontainer', 'docker', 'docs', 'apps/api-php', 'apps/api-symfony', 'apps/front']) {
   addPath(project, path, 'taskboard/')
 }
 // .env racine : toujours la valeur par défaut (le front appelle l'API PHP pur), quel que soit l'état local

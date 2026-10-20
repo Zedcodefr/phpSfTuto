@@ -58,7 +58,9 @@ ou à l'étape suivante.
 - [ ] Projet de départ téléchargé depuis la page *Ressources* du support, puis `make install` sans erreur
 - [ ] http://localhost:5173 affiche le front, http://localhost:8082/api/health répond `{"status":"ok"}`
 - [ ] `make php-check-a` affiche « à implémenter » (c'est normal : c'est votre travail)
-- [ ] Un éditeur PHP prêt : PhpStorm, ou VS Code avec les extensions *PHP Intelephense* et *PHP Debug*
+- [ ] Un éditeur PHP prêt : PhpStorm, ou VS Code avec les extensions *PHP Intelephense* et *PHP Debug*.
+  Sous VS Code, le plus simple est le **devcontainer** fourni : extension *Dev Containers*, puis *Reopen in Container*
+  (`make` et les extensions y sont déjà ; seul Docker est nécessaire sur la machine)
 
 ## Rituels (par événement)
 
@@ -121,4 +123,6 @@ La progression et les scores sont enregistrés dans votre navigateur.
 | Le front affiche « Impossible de charger les tâches » | L'API choisie répond-elle ? `curl localhost:8081/api/tasks` ; `make use-php` / `make use-symfony` |
 | Une requête SQL « ne marche pas » dans psql | Avez-vous terminé par `;` ? Êtes-vous sur la bonne base (`taskboard_php` ou `taskboard`) ? |
 | Permissions sur les fichiers générés (Linux) | Les conteneurs tournent avec votre UID : relancer via `make`, pas `docker compose` directement |
+| Devcontainer : `curl localhost:…` ne répond pas | La stack est-elle démarrée (`make up`) ? Puis relancer les relais de ports : `bash .devcontainer/forward-ports.sh` |
+| Devcontainer : Xdebug ne s'arrête pas sur le point d'arrêt | Le port 9003 est-il pris sur la machine (PhpStorm, autre devcontainer) ? `XDEBUG_MODE=debug make up` lancé ? |
 | Repartir de zéro | `make clean && make install` (⚠️ supprime les données) |

@@ -40,6 +40,11 @@ make install   # première fois : build, dépendances, bases de données (quelqu
 make help      # toutes les commandes
 ```
 
+**VS Code (devcontainer)** : avec l'extension *Dev Containers*, ouvrez le dossier puis *Reopen in Container*.
+Vous n'avez alors besoin que de Docker (pas de `make` à installer) : le terminal intégré a `make` et pilote la stack
+avec le Docker de votre machine, et les extensions PHP / Xdebug / oxc sont installées. Toutes les commandes du parcours
+(`make ...`, `curl http://localhost:8081/...`) fonctionnent telles quelles ; les URL s'ouvrent dans le navigateur de la machine.
+
 | URL | Quoi |
 |---|---|
 | http://localhost:5173 | Front React |
@@ -156,7 +161,8 @@ formation.mk · compose.formation.yaml     cibles make et service Docker du supp
 XDEBUG_MODE=debug make up
 ```
 
-- **VS Code** : extension *PHP Debug*, configurations fournies dans `.vscode/launch.json`.
+- **VS Code** : extension *PHP Debug*, configurations fournies dans `.vscode/launch.json`. Fonctionne aussi dans le
+  devcontainer (il publie le port 9003 sur la machine, que les conteneurs PHP appellent via `host.docker.internal`).
 - **PhpStorm** : *Settings › PHP › Servers* → ajouter un serveur nommé `taskboard-php` (host `localhost`, port `8081`)
   avec le path mapping `apps/api-php` → `/app`, et un second nommé `taskboard-symfony` (port `8082`)
   avec `apps/api-symfony` → `/app`. Puis activer l'écoute des connexions de debug (icône 📞).
