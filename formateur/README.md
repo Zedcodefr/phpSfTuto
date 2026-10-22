@@ -18,6 +18,7 @@ Les solutions, le contrat d'API, le kata et la charte IA sont communs.
 | Chemin | Rôle |
 |---|---|
 | `solutions/api-php/` | Solution complète de l'API PHP pur (étape 1). Passe `make php-check` (18/18) et les 3 vérifications de lots. |
+| `solutions/symfony-atelier/` | Solution de l'atelier pratique Symfony (étape 2) : services, contrainte, écouteur, exception, commande. 16/16 avec `make sf-atelier`. |
 | `solutions/doctrine-kata/` | Solution du kata Doctrine & DQL (`BookRepository`, `AuthorRepository`, `Library`) : 21/21 avec `make sf-kata`. |
 | `questions-comprehension-vue.md` | Réponses attendues aux questions orales de la formation Vue (fondamentaux back-end compris). |
 | `questions-comprehension.md` | Réponses attendues aux questions « à expliquer à l'oral » affichées sous chaque quiz de l'app, plus des questions de relance pour les revues orales. |
@@ -29,6 +30,7 @@ point de départ au backlog (étape 4). Il n'y a pas de solution pour le backlog
 
 Budget interne (formateur uniquement) : prévoir **au plus 3 jours de 7 h** (≈ 21 h de travail par profil).
 Les durées de ce guide servent uniquement à votre animation.
+L'atelier pratique Symfony (voir « Conseils d'animation ») de l'étape 2 compte pour **3 h côté back** dans ce budget : le dev front avance pendant ce temps sur F5.
 
 **Aucune durée n'est communiquée aux stagiaires : le support et les cours n'en affichent aucune.** Côté stagiaires,
 le parcours se fait **à son rythme**, par étapes ([docs/00-organisation.md](../docs/00-organisation.md#le-déroulé-par-étapes)) :
@@ -39,6 +41,7 @@ Points de contrôle, par événement (pas par horaire) :
 | Fin de… | Attendu | Contrôle |
 |---|---|---|
 | Étape 1 — PHP | API PHP pur intégrée | `make php-check` vert, front sur `make use-php` + oraux des lots |
+| Étape 2 — atelier Symfony | A1 → A5 par chacun (ou binôme) | `make sf-atelier` sur chaque branche `atelier/<prénom>` + débrief |
 | Étape 3 — kata Doctrine | Kata K01 → K16 + K20 par chacun | `make sf-kata` sur chaque branche `kata/<prénom>` + débrief K06 / K12 / K20 |
 | Étape 4 — Projet | Socle du backlog livré par chaque dev | `make sf-test` et `make sf-check` verts, front branché + oraux à la démo |
 
@@ -47,6 +50,7 @@ En séance, on présente **l'essentiel et les pièges** de chaque cours (les doc
 **Si l'équipe prend du retard**, coupez dans cet ordre :
 
 1. Les bonus des exercices PHP, puis les K17 → K21 du kata (sauf K20), qui passent en travail après formation.
+   À l'atelier Symfony : A5 (commande console) et les bonus ; A1 → A4 et le débrief restent.
 2. Au backlog, les tickets bonus, puis réduire chaque dev à **un** ticket socle livré et testé.
 3. Côté front : F11, puis les points « Bonus » de F8 → F10.
 
@@ -83,6 +87,17 @@ docker compose up -d --force-recreate api-php   # sinon le montage Docker pointe
 make php-composer c=install && make php-db-reset && make php-check
 ```
 
+### Atelier Symfony
+
+```bash
+cp -R formateur/solutions/symfony-atelier/src/. apps/api-symfony/src/
+make sf-cc && make sf-atelier     # 16/16 ; make sf-test et make sf-check restent verts
+git checkout -- apps/api-symfony/src && git clean -fd apps/api-symfony/src   # revenir au projet de départ
+```
+
+Les fichiers modifiés (`TaskController`, `Task`, les deux DTO) sont des copies complètes du projet de départ + l'atelier :
+sur un projet déjà avancé, donnez plutôt les fichiers nouveaux un par un.
+
 ### Kata Doctrine
 
 ```bash
@@ -118,6 +133,37 @@ Points de la solution PHP pur à commenter en séance :
   Symfony (voir `docs/02-symfony/03-visite-du-projet.md`).
 - Montrer le profiler (`/_profiler`) très tôt, en particulier l'onglet Doctrine (requêtes SQL, N+1).
 - `make sf c="debug:container --show-arguments TaskController"` et `debug:autowiring` démystifient l'autowiring.
+
+**Atelier pratique Symfony** (3 h, après le cours ; [sujet](../docs/02-symfony/05-atelier-pratique.md), tests `make sf-atelier`)
+
+| Durée | Quoi | Animation |
+|---|---|---|
+| 10 min | Lancement | Chacun crée `atelier/<prénom>`, lance `make sf-atelier` (16 tests, 13 rouges). Rappeler : lire le test d'abord. |
+| 15 min | A0 — outils de diagnostic | Corriger ensemble au tableau : c'est ce qui servira tout le reste de la formation. |
+| 30 min | A1 — route + service | Premier passage dans les rangs : « où est enregistré `TaskStats` ? » |
+| 30 min | A2 — contrainte de validation | Faire comparer avec `TaskValidator` du PHP pur. |
+| 30 min | A3 — écouteur d'événements | Le point le plus formateur : la priorité. Montrer `debug:event-dispatcher kernel.request` au tableau si besoin. |
+| 10 min | Pause | |
+| 30 min | A4 — exception métier → 409 | Laisser constater la 500 avant de donner l'indice `#[WithHttpStatus]`. |
+| 15 min | A5 — commande console | Souvent rapide une fois A1 fait ; sinon le couper (voir « Si l'équipe prend du retard »). |
+| 10 min | Débrief | Les 4 questions de fin du sujet, une par personne. |
+
+Réponses attendues au débrief :
+
+1. **Configuration écrite** : aucune ligne. Autowiring (services), autoconfiguration (validateur, écouteur, commande
+   trouvés par leur classe parente ou leur attribut), routes par attribut.
+2. **POST en majuscules** : `kernel.request` (ResponseTimeListener note l'heure, RouterListener trouve la route) →
+   `kernel.controller_arguments` : `RequestPayloadValueResolver` désérialise, le Validator appelle `NotShoutingValidator`,
+   la violation lève une exception → `kernel.exception` la rend en 422 JSON → `kernel.response` pose `X-Response-Time`.
+   Le contrôleur n'est jamais appelé.
+3. **Statistiques** : la logique est dans le service `TaskStats` ; le contrôleur et la commande ne sont que deux portes
+   d'entrée (HTTP, CLI). Même raison que la règle `complete()` dans l'entité : elle vaut d'où qu'on l'appelle.
+4. **Le plus coûteux en PHP pur** : l'écouteur (A3) — il aurait fallu modifier `index.php` et penser au `catch` pour les
+   erreurs — et la 409 (A4), à câbler dans le `try/catch` global.
+
+Pièges fréquents : priorité de l'écouteur trop basse (pas d'en-tête sur les 404), `strtoupper` au lieu de
+`mb_strtoupper` ou d'une regex Unicode (titres accentués), `persist()` inutile avant `flush()` dans `complete()`,
+`try/catch` dans le contrôleur au lieu de `#[WithHttpStatus]`.
 
 **Étape 3 — Doctrine & DQL** (cours 2 h max, kata 2 h max)
 - Faire le K01 et le K02 ensemble au tableau, puis chacun avance seul. Objectif : K01 → K16 + K20 ; le reste est en bonus.

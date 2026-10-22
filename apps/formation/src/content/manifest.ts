@@ -66,6 +66,12 @@ const csharpParts: Part[] = [
       { doc: '02-symfony/01-principes.md', title: 'Principes de Symfony', audience: 'back', quiz: 'symfony-principes' },
       { doc: '02-symfony/02-particularites.md', title: 'Particularités', audience: 'back', quiz: 'symfony-particularites' },
       { doc: '02-symfony/03-visite-du-projet.md', title: 'Visite du projet', audience: 'back' },
+      {
+        doc: '02-symfony/05-atelier-pratique.md',
+        title: 'Atelier pratique',
+        audience: 'back',
+        note: '5 exercices avec tests · make sf-atelier · débrief',
+      },
     ],
   },
   {
