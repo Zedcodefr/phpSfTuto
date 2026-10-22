@@ -34,6 +34,7 @@ const csharpParts: Part[] = [
     pages: [
       { doc: '00-organisation.md', title: 'Organisation', audience: 'tous' },
       { doc: '00-charte-ia.md', title: 'Charte IA', audience: 'tous' },
+      { doc: '00-ide.md', title: 'Configurer votre IDE', audience: 'tous', note: 'VS Code ou PhpStorm · Xdebug' },
       { doc: 'api-contract.md', title: 'Contrat d’API', audience: 'tous' },
     ],
   },
@@ -131,6 +132,7 @@ const vueParts: Part[] = [
     pages: [
       { doc: 'vue/00-organisation.md', title: 'Organisation', audience: 'tous' },
       { doc: '00-charte-ia.md', title: 'Charte IA', audience: 'tous' },
+      { doc: '00-ide.md', title: 'Configurer votre IDE', audience: 'tous', note: 'VS Code ou PhpStorm · Xdebug' },
       { doc: 'api-contract.md', title: 'Contrat d’API', audience: 'tous' },
     ],
   },
