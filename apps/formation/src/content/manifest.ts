@@ -175,6 +175,12 @@ const vueParts: Part[] = [
       { doc: 'vue/03-symfony/01-principes.md', title: 'Principes de Symfony', audience: 'back', quiz: 'vue-symfony-principes' },
       { doc: 'vue/03-symfony/02-particularites.md', title: 'Particularités', audience: 'back', quiz: 'vue-symfony-particularites' },
       { doc: 'vue/03-symfony/03-visite-du-projet.md', title: 'Visite du projet', audience: 'back' },
+      {
+        doc: 'vue/03-symfony/04-atelier-pratique.md',
+        title: 'Atelier pratique',
+        audience: 'back',
+        note: '5 exercices avec tests · make sf-atelier · débrief',
+      },
     ],
   },
   {

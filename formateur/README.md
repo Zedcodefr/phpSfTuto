@@ -235,6 +235,9 @@ Budget interne (formateur uniquement, jamais communiqué) : du même ordre que l
   À traquer en revue et à l'oral, notamment pour les filtres et la pagination de B3.
 - **N+1.** Habitués à « l'objet JSON imbriqué qui arrive tout prêt », ils accèdent aux relations dans une boucle sans voir
   les requêtes. Montrez l'onglet Doctrine du profiler très tôt, puis K06 (fetch join) au débrief du kata.
+- **Atelier pratique Symfony** ([sujet](../docs/vue/03-symfony/04-atelier-pratique.md)) : mêmes exercices, mêmes tests
+  (`make sf-atelier`), même solution et même minutage que pour la formation C# (voir « Conseils d'animation »). Seules
+  les questions de comparaison changent : middleware Express au lieu d'ASP.NET Core, scripts `package.json` au lieu de .NET.
 - **Codes HTTP.** Ils les ont consommés, rarement choisis : faire justifier chaque code renvoyé (400 vs 422, 401 vs 403, 404, 409).
 - **Sécurité.** Le token et `localStorage` leur sont familiers ; le hash des mots de passe, l'autorisation par ressource
   et les secrets côté serveur beaucoup moins : à vérifier à l'oral du ticket B2.
